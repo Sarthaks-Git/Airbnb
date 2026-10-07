@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 type Listing = {
@@ -29,7 +29,7 @@ type ListingResponse = {
 
 const USER_ID = 3;
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -748,5 +748,19 @@ export default function CheckoutPage() {
       )}
 
     </main>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen max-w-6xl mx-auto p-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

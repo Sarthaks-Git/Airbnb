@@ -322,10 +322,10 @@ export default function Home() {
 
 
   const [favorites, setFavorites] = useState<number[]>(
-
     []
-
   );
+
+  const [isMapView, setIsMapView] = useState(false);
 
 
 
@@ -342,6 +342,7 @@ export default function Home() {
   const [isCompactHeader, setIsCompactHeader] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
 
 
@@ -441,12 +442,20 @@ export default function Home() {
 
 
   useEffect(() => {
-    const handleScroll = () => {
-      const shouldCompact = window.scrollY > 120;
+    let frameId: number | null = null;
 
-      setIsCompactHeader((current) =>
-        current === shouldCompact ? current : shouldCompact
-      );
+    const handleScroll = () => {
+      if (frameId !== null) return;
+
+      frameId = window.requestAnimationFrame(() => {
+        const shouldCompact = window.scrollY > 120;
+
+        setIsCompactHeader((current) =>
+          current === shouldCompact ? current : shouldCompact
+        );
+
+        frameId = null;
+      });
     };
 
     handleScroll();
@@ -454,8 +463,13 @@ export default function Home() {
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
     };
   }, []);
+
 
 
   async function fetchListings() {
@@ -1240,7 +1254,7 @@ export default function Home() {
 
         <div className="mx-auto max-w-[1440px] px-6">
 
-          <div className="relative flex items-center justify-between py-5">
+          <div className="flex items-center justify-between py-5">
 
             {/* LOGO */}
 
@@ -1362,41 +1376,6 @@ export default function Home() {
 
 
 
-            {/* COMPACT SEARCH - shown after scrolling */}
-
-            <button
-              onClick={() =>
-                window.scrollTo({
-                  top: 0,
-                  behavior: "smooth",
-                })
-              }
-              className={`absolute left-1/2 hidden w-[430px] -translate-x-1/2 cursor-pointer items-center rounded-full border bg-white px-2 py-2 shadow-sm transition-[opacity,transform] duration-200 ease-out md:flex ${
-                isCompactHeader
-                  ? "pointer-events-auto scale-100 opacity-100"
-                  : "pointer-events-none scale-95 opacity-0"
-              }`}
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-3 px-4 text-left">
-                <span className="truncate text-sm font-semibold">
-                  {location || "Anywhere"}
-                </span>
-                <span className="h-4 w-px bg-gray-200" />
-                <span className="shrink-0 text-sm text-gray-500">
-                  {checkIn && checkOut
-                    ? `${formatDate(checkIn)} – ${formatDate(checkOut)}`
-                    : "Any week"}
-                </span>
-                <span className="h-4 w-px bg-gray-200" />
-                <span className="shrink-0 text-sm text-gray-500">
-                  {totalGuests > 0 ? `${totalGuests} guests` : "Add guests"}
-                </span>
-              </span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff385c] text-sm text-white">
-                🔍
-              </span>
-            </button>
-
             {/* RIGHT NAV */}
 
 
@@ -1453,6 +1432,54 @@ export default function Home() {
 
               </button>
 
+              {showMenu && (
+                <div ref={menuRef} className="absolute right-0 top-14 w-80 max-h-[calc(100vh-180px)] overflow-y-auto rounded-2xl border bg-white shadow-xl z-50">
+                  <div className="px-4 py-3 border-b">
+                    <p className="font-semibold text-gray-900">Signed in as Guest</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <span className="text-green-600 font-bold">✓</span> Identity Verified
+                    </p>
+                  </div>
+
+                  <div className="py-2">
+                    <button onClick={() => { setShowMenu(false); router.push("/wishlists"); }} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      <span className="font-semibold">Wishlists</span>
+                      <span>❤️</span>
+                    </button>
+                    <button onClick={() => { setShowMenu(false); router.push("/trips"); }} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      <span className="font-semibold">Trips</span>
+                      <span>✈️</span>
+                    </button>
+                    <button onClick={() => { setShowMenu(false); setToast("Messages coming soon"); }} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      <span className="font-semibold">Messages</span>
+                      <span>💬</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t" />
+
+                  <div className="py-2">
+                    <button onClick={() => { setShowMenu(false); router.push("/host"); }} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      <span className="font-semibold">Switch to Host</span>
+                      <span className="text-xs rounded bg-gray-100 px-2 py-1 font-semibold border">Host Portal</span>
+                    </button>
+                    <button onClick={() => { setShowMenu(false); setToast("Account settings coming soon"); }} className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      Account settings
+                    </button>
+                    <button onClick={() => { setShowMenu(false); setToast("Help Centre coming soon"); }} className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      Help Centre
+                    </button>
+                  </div>
+
+                  <div className="border-t" />
+
+                  <div className="py-2">
+                    <button onClick={() => { setShowMenu(false); setToast("Logged out"); }} className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100 transition">
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
@@ -1471,9 +1498,9 @@ export default function Home() {
 
             ref={searchRef}
 
-            className={`relative mx-auto max-w-4xl overflow-hidden transition-[opacity,transform,max-height,margin] duration-200 ease-out ${
+            className={`relative mx-auto max-w-4xl overflow-hidden transition-[max-height,opacity,transform,margin] duration-300 ease-out ${
               isCompactHeader
-                ? "pointer-events-none mb-0 max-h-0 -translate-y-1 opacity-0"
+                ? "pointer-events-none mb-0 max-h-0 -translate-y-2 opacity-0"
                 : "mb-5 max-h-28 translate-y-0 opacity-100"
             }`}
 
@@ -1672,12 +1699,22 @@ export default function Home() {
               <div className="absolute left-0 top-[72px] z-50 w-[420px] rounded-3xl bg-white p-7 shadow-xl">
 
                 <h3 className="text-sm font-semibold">
-
                   Search destinations
-
                 </h3>
 
-
+                <input
+                  autoFocus
+                  type="text"
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && location.trim()) {
+                      setActivePanel("when");
+                    }
+                  }}
+                  placeholder="Search destinations"
+                  className="mt-4 w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-gray-900"
+                />
 
                 <div className="mt-5 space-y-2">
 
@@ -2072,216 +2109,6 @@ export default function Home() {
           </div>
 
 
-
-          {/* =================================================
-
-              MENU
-
-          ================================================= */}
-
-
-
-          {showMenu && (
-
-            <div className="absolute right-0 top-14 w-80 max-h-[calc(100vh-180px)] overflow-y-auto rounded-2xl border bg-white shadow-xl">
-
-              {[
-
-                ["♡", "Wishlists"],
-
-                ["♧", "Trips"],
-
-                ["▢", "Messages"],
-
-                ["◎", "Profile"],
-
-              ].map(([icon, label]) => (
-
-                <button
-
-                  key={label}
-
-                  onClick={() => {
-
-                    if (
-
-                      label === "Trips"
-
-                    ) {
-
-                      router.push(
-
-                        "/trips"
-
-                      );
-
-                    } else {
-
-                      setToast(
-
-                        `${label} is coming soon`
-
-                      );
-
-                    }
-
-
-
-                    setShowMenu(false);
-
-                  }}
-
-                  className="flex w-full cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
-
-                >
-
-                  <span className="text-xl">
-
-                    {icon}
-
-                  </span>
-
-
-
-                  {label}
-
-                </button>
-
-              ))}
-
-
-
-              <div className="my-2 border-t" />
-
-
-
-              {[
-
-                ["🔔", "Notifications"],
-
-                [
-
-                  "⚙️",
-
-                  "Account settings",
-
-                ],
-
-                [
-
-                  "🌐",
-
-                  "Language & currency",
-
-                ],
-
-                ["?", "Help Centre"],
-
-              ].map(([icon, label]) => (
-
-                <button
-
-                  key={label}
-
-                  onClick={() => {
-
-                    setToast(
-
-                      `${label} is coming soon`
-
-                    );
-
-
-
-                    setShowMenu(false);
-
-                  }}
-
-                  className="flex w-full cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
-
-                >
-
-                  <span className="text-lg">
-
-                    {icon}
-
-                  </span>
-
-
-
-                  {label}
-
-                </button>
-
-              ))}
-
-
-
-              <div className="my-2 border-t" />
-
-
-
-              <button
-
-                onClick={() => {
-
-                  router.push("/host");
-
-                  setShowMenu(false);
-
-                }}
-
-                className="w-full cursor-pointer rounded-xl px-4 py-3 text-left text-sm font-semibold hover:bg-gray-100"
-
-              >
-
-                Become a host
-
-              </button>
-
-
-
-              <button
-
-                onClick={() => {
-
-                  setToast("Coming soon");
-
-                  setShowMenu(false);
-
-                }}
-
-                className="w-full cursor-pointer rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
-
-              >
-
-                Refer a host
-
-              </button>
-
-
-
-              <button
-
-                onClick={() => {
-
-                  setToast("Logged out");
-
-                  setShowMenu(false);
-
-                }}
-
-                className="mt-2 w-full cursor-pointer border-t px-4 py-4 text-left text-sm"
-
-              >
-
-                Log out
-
-              </button>
-
-            </div>
-
-          )}
 
         </div>
 
@@ -2731,8 +2558,27 @@ export default function Home() {
 
           </div>
 
+        ) : isMapView ? (
+          <div className="h-[70vh] w-full rounded-2xl bg-gray-100 overflow-hidden relative shadow-inner border mb-12">
+            <div className="absolute inset-0 z-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=India&zoom=5&size=1200x800&scale=2&maptype=roadmap&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|element:labels|visibility:off&style=feature:administrative|element:geometry.stroke|color:0xcbd1d1&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9')] bg-cover bg-center opacity-80 mix-blend-multiply"></div>
+            
+            {listings.map((listing, i) => (
+              <div 
+                key={listing.id}
+                onClick={() => openListing(listing.id)}
+                className="absolute z-10 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform shadow-lg hover:z-50"
+                style={{ 
+                  top: `${15 + (i * 17) % 70}%`, 
+                  left: `${20 + (i * 31) % 60}%` 
+                }}
+              >
+                <div className="bg-white px-3 py-1.5 rounded-2xl shadow-md text-sm font-bold flex items-center hover:bg-black hover:text-white transition-colors border border-gray-200">
+                  ₹{listing.price_per_night}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-
           groupedListings.map(
 
             (
@@ -2857,27 +2703,9 @@ export default function Home() {
 
                               src={image}
 
-                              alt={listing.title}
+                              alt={
 
-                              loading={
-
-                                sectionIndex === 0 && index < 6
-
-                                  ? "eager"
-
-                                  : "lazy"
-
-                              }
-
-                              decoding="async"
-
-                              fetchPriority={
-
-                                sectionIndex === 0 && index < 3
-
-                                  ? "high"
-
-                                  : "auto"
+                                listing.title
 
                               }
 
@@ -3269,14 +3097,28 @@ export default function Home() {
 
 
       {toast && (
-
-        <div className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-xl bg-gray-900 px-6 py-4 text-sm font-medium text-white shadow-xl">
-
+        <div className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 rounded-xl bg-gray-900 px-6 py-4 text-sm font-medium text-white shadow-xl transition-all duration-300">
           {toast}
-
         </div>
-
       )}
+
+      {/* Map Toggle Button */}
+      <div className="fixed bottom-10 left-1/2 z-50 -translate-x-1/2">
+        <button
+          onClick={() => setIsMapView(!isMapView)}
+          className="flex cursor-pointer items-center gap-2 rounded-full bg-gray-900 px-5 py-3.5 text-sm font-semibold text-white shadow-xl hover:scale-105 hover:bg-black transition-transform"
+        >
+          {isMapView ? (
+            <>
+              Show list <span className="text-lg">📋</span>
+            </>
+          ) : (
+            <>
+              Show map <span className="text-lg">🗺️</span>
+            </>
+          )}
+        </button>
+      </div>
 
     </main>
 

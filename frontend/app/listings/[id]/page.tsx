@@ -1,12 +1,8 @@
 "use client";
 
-
-
 import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
-
-
 
 type Image = {
 
@@ -18,8 +14,6 @@ type Image = {
 
 };
 
-
-
 type Amenity = {
 
   id: number;
@@ -27,8 +21,6 @@ type Amenity = {
   name: string;
 
 };
-
-
 
 type Listing = {
 
@@ -54,8 +46,6 @@ type Listing = {
 
 };
 
-
-
 type ListingResponse = {
 
   listing: Listing;
@@ -65,8 +55,6 @@ type ListingResponse = {
   amenities: Amenity[];
 
 };
-
-
 
 type Review = {
 
@@ -82,11 +70,7 @@ type Review = {
 
 };
 
-
-
 const USER_ID = 3;
-
-
 
 export default function ListingPage() {
 
@@ -96,13 +80,9 @@ export default function ListingPage() {
 
   const id = params.id;
 
-
-
   const [data, setData] = useState<ListingResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
-
-
 
   const [reviews, setReviews] = useState<Review[]>([]);
 
@@ -114,34 +94,27 @@ export default function ListingPage() {
 
   const [reviewLoading, setReviewLoading] = useState(false);
 
-
-
   const [checkIn, setCheckIn] = useState("");
 
   const [checkOut, setCheckOut] = useState("");
 
   const [guests, setGuests] = useState(1);
 
-
-
   const [bookingLoading, setBookingLoading] = useState(false);
 
   const [bookingMessage, setBookingMessage] = useState("");
 
-
-
   const [showComingSoon, setShowComingSoon] = useState(false);
+
   const [saved, setSaved] = useState(false);
+
   const [toast, setToast] = useState("");
+
   const [showAllPhotos, setShowAllPhotos] = useState(false);
-
-
 
   function getToday() {
 
     const today = new Date();
-
-
 
     const year = today.getFullYear();
 
@@ -149,17 +122,11 @@ export default function ListingPage() {
 
     const day = String(today.getDate()).padStart(2, "0");
 
-
-
     return `${year}-${month}-${day}`;
 
   }
 
-
-
   const today = getToday();
-
-
 
   async function fetchReviews() {
 
@@ -171,19 +138,13 @@ export default function ListingPage() {
 
       );
 
-
-
       if (!response.ok) {
 
         return;
 
       }
 
-
-
       const result = await response.json();
-
-
 
       setReviews(result || []);
 
@@ -195,51 +156,89 @@ export default function ListingPage() {
 
   }
 
-
-
   async function toggleSave() {
+
     if (!data?.listing) return;
 
     try {
+
       const response = await fetch(
+
         `http://127.0.0.1:8000/favorites/${data.listing.id}?user_id=${USER_ID}`,
+
         { method: saved ? "DELETE" : "POST" }
+
       );
 
       if (!response.ok) {
+
         throw new Error("Favorite request failed");
+
       }
 
       setSaved((current) => !current);
+
       setToast(saved ? "Removed from wishlist" : "Saved to wishlist");
+
     } catch (error) {
+
       console.error("Favorite request failed:", error);
+
       setToast("Unable to update wishlist");
+
     }
+
   }
 
   async function handleShare() {
+
     try {
+
       if (navigator.share) {
+
         await navigator.share({
+
           title: data?.listing.title || "Airbnb stay",
+
           text: data?.listing.title || "Check out this stay",
+
           url: window.location.href,
+
         });
+
       } else {
+
         await navigator.clipboard.writeText(window.location.href);
+
         setToast("Link copied to clipboard");
+
       }
+
     } catch (error) {
+
       if ((error as DOMException).name !== "AbortError") {
+
         setToast("Unable to share this listing");
+
       }
+
     }
+
   }
 
   useEffect(() => {
 
-    fetch(`http://127.0.0.1:8000/listings/${id}`)
+    fetch(
+
+      `http://127.0.0.1:8000/listings/${id}?\_=${Date.now()}`,
+
+      {
+
+        cache: "no-store",
+
+      }
+
+    )
 
       .then((response) => response.json())
 
@@ -259,19 +258,13 @@ export default function ListingPage() {
 
       });
 
-
-
     fetchReviews();
 
   }, [id]);
 
-
-
   function handleCheckInChange(value: string) {
 
     setCheckIn(value);
-
-
 
     if (checkOut && value >= checkOut) {
 
@@ -279,13 +272,9 @@ export default function ListingPage() {
 
     }
 
-
-
     setBookingMessage("");
 
   }
-
-
 
   function handleCheckOutChange(value: string) {
 
@@ -295,23 +284,27 @@ export default function ListingPage() {
 
   }
 
-
-
   function updateGuests(amount: number) {
+
     setGuests((current) =>
+
       Math.min(
+
         listing.max_guests,
+
         Math.max(1, current + amount)
+
       )
+
     );
+
     setBookingMessage("");
+
   }
 
   async function handleReserve() {
 
     setBookingMessage("");
-
-
 
     if (!checkIn || !checkOut) {
 
@@ -325,8 +318,6 @@ export default function ListingPage() {
 
     }
 
-
-
     if (checkOut <= checkIn) {
 
       setBookingMessage(
@@ -338,8 +329,6 @@ export default function ListingPage() {
       return;
 
     }
-
-
 
     if (guests < 1 || guests > listing.max_guests) {
 
@@ -353,11 +342,7 @@ export default function ListingPage() {
 
     }
 
-
-
     setBookingLoading(true);
-
-
 
     try {
 
@@ -371,19 +356,13 @@ export default function ListingPage() {
 
         `&check_out=${checkOut}`;
 
-
-
       const availabilityResponse =
 
         await fetch(availabilityUrl);
 
-
-
       const availabilityData =
 
         await availabilityResponse.json();
-
-
 
       if (!availabilityResponse.ok) {
 
@@ -393,15 +372,11 @@ export default function ListingPage() {
 
         );
 
-
-
         setBookingLoading(false);
 
         return;
 
       }
-
-
 
       if (!availabilityData.available) {
 
@@ -411,15 +386,11 @@ export default function ListingPage() {
 
         );
 
-
-
         setBookingLoading(false);
 
         return;
 
       }
-
-
 
       /*
 
@@ -457,8 +428,6 @@ export default function ListingPage() {
 
       );
 
-
-
       setBookingMessage(
 
         "Something went wrong. Please try again."
@@ -467,19 +436,13 @@ export default function ListingPage() {
 
     }
 
-
-
     setBookingLoading(false);
 
   }
 
-
-
   async function handleSubmitReview() {
 
     setReviewMessage("");
-
-
 
     if (!reviewComment.trim()) {
 
@@ -489,11 +452,7 @@ export default function ListingPage() {
 
     }
 
-
-
     setReviewLoading(true);
-
-
 
     try {
 
@@ -509,8 +468,6 @@ export default function ListingPage() {
 
       });
 
-
-
       const response = await fetch(
 
         `http://127.0.0.1:8000/reviews/?${params.toString()}`,
@@ -523,11 +480,7 @@ export default function ListingPage() {
 
       );
 
-
-
       const result = await response.json();
-
-
 
       if (!response.ok) {
 
@@ -537,15 +490,11 @@ export default function ListingPage() {
 
         );
 
-
-
         setReviewLoading(false);
 
         return;
 
       }
-
-
 
       setReviewComment("");
 
@@ -556,8 +505,6 @@ export default function ListingPage() {
         "Review submitted successfully!"
 
       );
-
-
 
       await fetchReviews();
 
@@ -571,8 +518,6 @@ export default function ListingPage() {
 
       );
 
-
-
       setReviewMessage(
 
         "Something went wrong. Please try again."
@@ -581,18 +526,18 @@ export default function ListingPage() {
 
     }
 
-
-
     setReviewLoading(false);
 
   }
 
-
-
   useEffect(() => {
+
     if (!toast) return;
+
     const timer = setTimeout(() => setToast(""), 2500);
+
     return () => clearTimeout(timer);
+
   }, [toast]);
 
   if (loading) {
@@ -609,8 +554,6 @@ export default function ListingPage() {
 
   }
 
-
-
   if (!data || !data.listing) {
 
     return (
@@ -625,11 +568,7 @@ export default function ListingPage() {
 
   }
 
-
-
   const { listing, images, amenities } = data;
-
-
 
   function calculateNights() {
 
@@ -639,19 +578,13 @@ export default function ListingPage() {
 
     }
 
-
-
     const start = new Date(`${checkIn}T00:00:00`);
 
     const end = new Date(`${checkOut}T00:00:00`);
 
-
-
     const difference =
 
       end.getTime() - start.getTime();
-
-
 
     return Math.ceil(
 
@@ -661,11 +594,7 @@ export default function ListingPage() {
 
   }
 
-
-
   const nights = calculateNights();
-
-
 
   const nightlyTotal =
 
@@ -675,8 +604,6 @@ export default function ListingPage() {
 
       : 0;
 
-
-
   const cleaningFee =
 
     nights > 0
@@ -684,8 +611,6 @@ export default function ListingPage() {
       ? 500
 
       : 0;
-
-
 
   const serviceFee =
 
@@ -695,8 +620,6 @@ export default function ListingPage() {
 
       : 0;
 
-
-
   const totalPrice =
 
     nightlyTotal +
@@ -704,8 +627,6 @@ export default function ListingPage() {
     cleaningFee +
 
     serviceFee;
-
-
 
   const averageRating =
 
@@ -721,19 +642,13 @@ export default function ListingPage() {
 
       : 0;
 
-
-
   return (
 
     <main className="min-h-screen bg-white text-gray-900">
 
-
-
-      {/* Navbar */}
+      {/***** Navbar *****/}
 
       <nav className="flex items-center justify-between border-b px-8 py-5">
-
-
 
         <button
 
@@ -747,11 +662,7 @@ export default function ListingPage() {
 
         </button>
 
-
-
         <div className="flex items-center gap-6 text-sm">
-
-
 
           <button
 
@@ -765,8 +676,6 @@ export default function ListingPage() {
 
           </button>
 
-
-
           <button
 
             onClick={() => router.push("/trips")}
@@ -779,8 +688,6 @@ export default function ListingPage() {
 
           </button>
 
-
-
           <button
 
             onClick={() => router.push("/host")}
@@ -792,8 +699,6 @@ export default function ListingPage() {
             Airbnb your home
 
           </button>
-
-
 
           <button
 
@@ -809,8 +714,6 @@ export default function ListingPage() {
 
           </button>
 
-
-
           <button
 
             onClick={() => setShowComingSoon(true)}
@@ -825,19 +728,13 @@ export default function ListingPage() {
 
           </button>
 
-
-
         </div>
 
       </nav>
 
-
-
       <div className="mx-auto max-w-6xl px-6 py-8">
 
-
-
-        {/* Back */}
+        {/***** Back *****/}
 
         <button
 
@@ -851,108 +748,182 @@ export default function ListingPage() {
 
         </button>
 
+        {/***** Listing title + actions *****/}
 
-
-        {/* Listing title + actions */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+
           <div>
+
             <h1 className="text-3xl font-semibold">
+
               {listing.title}
+
             </h1>
 
             <div className="mt-2 flex flex-wrap items-center gap-3 text-gray-600">
+
               <span>📍 {listing.location}</span>
+
               <span>·</span>
+
               <span>
+
                 ★ {reviews.length > 0 ? averageRating.toFixed(1) : "New"}
+
               </span>
+
               {reviews.length > 0 && (
+
                 <>
+
                   <span>·</span>
+
                   <span>
+
                     {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+
                   </span>
+
                 </>
+
               )}
+
             </div>
+
           </div>
 
           <div className="flex items-center gap-2">
+
             <button
+
               onClick={handleShare}
+
               className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold hover:bg-gray-100"
+
             >
+
               ↗ Share
+
             </button>
+
             <button
+
               onClick={toggleSave}
+
               className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold hover:bg-gray-100"
+
             >
+
               {saved ? "♥ Saved" : "♡ Save"}
+
             </button>
+
           </div>
+
         </div>
 
-        {/* Airbnb-style photo gallery */}
+        {/***** Airbnb-style photo gallery *****/}
+
         <div className="relative mt-6 overflow-hidden rounded-2xl">
+
           {images.length > 0 ? (
+
             <div className="grid h-[420px] grid-cols-1 gap-2 md:grid-cols-2">
+
               <img
+
                 src={images[0].image_url}
+
                 alt={listing.title}
+
                 loading="eager"
+
                 decoding="async"
+
                 className="h-full w-full object-cover md:rounded-l-2xl"
+
               />
 
               <div className="hidden grid-cols-2 grid-rows-2 gap-2 md:grid">
+
                 {images.slice(1, 5).map((image, index) => (
+
                   <img
+
                     key={image.id}
+
                     src={image.image_url}
+
                     alt={`${listing.title} photo ${index + 2}`}
+
                     loading="lazy"
+
                     decoding="async"
+
                     className={`h-full w-full object-cover ${
+
                       index === 1 ? "rounded-tr-2xl" : ""
+
                     } ${index === 3 ? "rounded-br-2xl" : ""}`}
+
                   />
+
                 ))}
+
               </div>
+
             </div>
+
           ) : (
+
             <div className="flex h-[420px] items-center justify-center bg-gray-100 text-gray-500">
+
               No photos available
+
             </div>
+
           )}
 
           <button
+
             onClick={() => setShowAllPhotos(true)}
+
             className="absolute bottom-4 right-4 cursor-pointer rounded-lg border bg-white px-4 py-2 text-sm font-semibold shadow-md transition hover:bg-gray-50"
+
           >
+
             ▣ Show all photos
+
           </button>
+
         </div>
 
-        {/* Main content */}
+        {/***** Main content *****/}
 
         <div className="mt-8 grid gap-10 md:grid-cols-3">
 
-
-
-          {/* Listing information */}
+          {/***** Listing information *****/}
 
           <section className="md:col-span-2">
 
-
-
-            <h2 className="text-2xl font-semibold">
-
-              {listing.property_type} hosted by a host
-
-            </h2>
-
-
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">
+                  {listing.property_type} hosted by an Airbnb Host
+                </h2>
+                <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                  <span className="font-semibold text-gray-900">Superhost</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-green-600 font-bold">✓</span>
+                    Identity verified
+                  </span>
+                </div>
+              </div>
+              <div className="h-14 w-14 overflow-hidden rounded-full bg-gray-200">
+                <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80" alt="Host avatar" className="h-full w-full object-cover" />
+              </div>
+            </div>
 
             <p className="mt-2 text-gray-600">
 
@@ -966,11 +937,7 @@ export default function ListingPage() {
 
             </p>
 
-
-
             <hr className="my-6" />
-
-
 
             <h2 className="text-xl font-semibold">
 
@@ -978,27 +945,19 @@ export default function ListingPage() {
 
             </h2>
 
-
-
             <p className="mt-3 leading-7 text-gray-600">
 
               {listing.description}
 
             </p>
 
-
-
             <hr className="my-6" />
-
-
 
             <h2 className="text-xl font-semibold">
 
               What this place offers
 
             </h2>
-
-
 
             <div className="mt-4 grid grid-cols-2 gap-4">
 
@@ -1020,17 +979,26 @@ export default function ListingPage() {
 
             </div>
 
+            <hr className="my-8" />
+            <h2 className="text-xl font-semibold mb-4">Where you'll be</h2>
+            <div className="h-[400px] w-full rounded-2xl bg-gray-100 overflow-hidden relative shadow-inner border">
+              <div className="absolute inset-0 z-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=India&zoom=11&size=800x400&scale=2&maptype=roadmap&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|element:labels|visibility:off&style=feature:administrative|element:geometry.stroke|color:0xcbd1d1&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9')] bg-cover bg-center opacity-80 mix-blend-multiply"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="h-16 w-16 rounded-full bg-[#ff385c]/20 flex items-center justify-center animate-pulse absolute -inset-2"></div>
+                <div className="relative bg-[#ff385c] text-white px-4 py-2 rounded-2xl shadow-lg font-bold flex flex-col items-center">
+                  <span>🏠</span>
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-[#ff385c] rotate-45"></div>
+                </div>
+              </div>
+            </div>
+            <p className="mt-4 text-gray-600 font-medium">{listing.location}</p>
+            <p className="mt-1 text-gray-500 text-sm">Exact location provided after booking.</p>
 
-
-            {/* Reviews */}
+            {/***** Reviews *****/}
 
             <hr className="my-8" />
 
-
-
             <div>
-
-
 
               <h2 className="text-xl font-semibold">
 
@@ -1052,8 +1020,6 @@ export default function ListingPage() {
 
               </h2>
 
-
-
               {reviews.length === 0 ? (
 
                 <p className="mt-4 text-gray-500">
@@ -1068,8 +1034,6 @@ export default function ListingPage() {
 
                 <div className="mt-5 space-y-5">
 
-
-
                   {reviews.map((review) => (
 
                     <div
@@ -1080,19 +1044,13 @@ export default function ListingPage() {
 
                     >
 
-
-
                       <div className="flex items-center justify-between">
-
-
 
                         <span className="font-semibold">
 
                           Guest
 
                         </span>
-
-
 
                         <span>
 
@@ -1102,11 +1060,7 @@ export default function ListingPage() {
 
                         </span>
 
-
-
                       </div>
-
-
 
                       <p className="mt-2 text-gray-600">
 
@@ -1114,33 +1068,23 @@ export default function ListingPage() {
 
                       </p>
 
-
-
                     </div>
 
                   ))}
-
-
 
                 </div>
 
               )}
 
-
-
-              {/* Review form */}
+              {/***** Review form *****/}
 
               <div className="mt-8 rounded-xl border p-5">
-
-
 
                 <h3 className="font-semibold">
 
                   Leave a review
 
                 </h3>
-
-
 
                 <p className="mt-1 text-sm text-gray-500">
 
@@ -1150,19 +1094,13 @@ export default function ListingPage() {
 
                 </p>
 
-
-
                 <div className="mt-4">
-
-
 
                   <label className="text-sm font-medium">
 
                     Rating
 
                   </label>
-
-
 
                   <select
 
@@ -1188,15 +1126,11 @@ export default function ListingPage() {
 
                     </option>
 
-
-
                     <option value={4}>
 
                       4 - Great
 
                     </option>
-
-
 
                     <option value={3}>
 
@@ -1204,15 +1138,11 @@ export default function ListingPage() {
 
                     </option>
 
-
-
                     <option value={2}>
 
                       2 - Okay
 
                     </option>
-
-
 
                     <option value={1}>
 
@@ -1220,15 +1150,9 @@ export default function ListingPage() {
 
                     </option>
 
-
-
                   </select>
 
-
-
                 </div>
-
-
 
                 <textarea
 
@@ -1248,8 +1172,6 @@ export default function ListingPage() {
 
                 />
 
-
-
                 <button
 
                   onClick={handleSubmitReview}
@@ -1268,8 +1190,6 @@ export default function ListingPage() {
 
                 </button>
 
-
-
                 {reviewMessage && (
 
                   <p className="mt-3 text-sm font-medium">
@@ -1280,25 +1200,15 @@ export default function ListingPage() {
 
                 )}
 
-
-
               </div>
-
-
 
             </div>
 
-
-
           </section>
 
-
-
-          {/* Booking card */}
+          {/***** Booking card *****/}
 
           <aside className="h-fit rounded-xl border p-6 shadow-lg md:sticky md:top-24">
-
-
 
             <p className="text-xl font-semibold">
 
@@ -1312,29 +1222,19 @@ export default function ListingPage() {
 
             </p>
 
-
-
             <div className="mt-5 rounded-lg border">
 
-
-
-              {/* Dates */}
+              {/***** Dates *****/}
 
               <div className="grid grid-cols-2">
 
-
-
                 <div className="border-r p-3">
-
-
 
                   <label className="text-xs font-semibold">
 
                     CHECK-IN
 
                   </label>
-
-
 
                   <input
 
@@ -1358,23 +1258,15 @@ export default function ListingPage() {
 
                   />
 
-
-
                 </div>
 
-
-
                 <div className="p-3">
-
-
 
                   <label className="text-xs font-semibold">
 
                     CHECK-OUT
 
                   </label>
-
-
 
                   <input
 
@@ -1400,74 +1292,91 @@ export default function ListingPage() {
 
                   />
 
-
-
                 </div>
-
-
 
               </div>
 
-
-
-              {/* Guests */}
+              {/***** Guests *****/}
 
               <div className="border-t p-4">
+
                 <div className="flex items-center justify-between">
+
                   <div>
+
                     <label className="text-xs font-semibold">
+
                       GUESTS
+
                     </label>
+
                     <p className="mt-1 text-sm text-gray-500">
+
                       {guests} {guests === 1 ? "guest" : "guests"}
+
                     </p>
+
                   </div>
 
                   <div className="flex items-center gap-3">
+
                     <button
+
                       type="button"
+
                       onClick={() => updateGuests(-1)}
+
                       disabled={guests <= 1}
+
                       className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-lg text-gray-600 transition hover:border-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+
                       aria-label="Decrease guests"
+
                     >
+
                       −
+
                     </button>
 
                     <span className="w-5 text-center text-sm font-semibold">
+
                       {guests}
+
                     </span>
 
                     <button
+
                       type="button"
+
                       onClick={() => updateGuests(1)}
+
                       disabled={guests >= listing.max_guests}
+
                       className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-lg text-gray-600 transition hover:border-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+
                       aria-label="Increase guests"
+
                     >
+
                       +
+
                     </button>
+
                   </div>
+
                 </div>
+
               </div>
-
-
 
             </div>
 
-
-
-            {/* Price breakdown */}
+            {/***** Price breakdown *****/}
 
             {nights > 0 && (
 
               <div className="mt-5 space-y-3 text-sm">
 
-
-
                 <div className="flex justify-between">
-
-
 
                   <span>
 
@@ -1483,23 +1392,15 @@ export default function ListingPage() {
 
                   </span>
 
-
-
                   <span>
 
                     ₹{nightlyTotal.toLocaleString()}
 
                   </span>
 
-
-
                 </div>
 
-
-
                 <div className="flex justify-between">
-
-
 
                   <span>
 
@@ -1507,31 +1408,21 @@ export default function ListingPage() {
 
                   </span>
 
-
-
                   <span>
 
                     ₹{cleaningFee.toLocaleString()}
 
                   </span>
 
-
-
                 </div>
 
-
-
                 <div className="flex justify-between">
-
-
 
                   <span>
 
                     Service fee
 
                   </span>
-
-
 
                   <span>
 
@@ -1543,27 +1434,17 @@ export default function ListingPage() {
 
                   </span>
 
-
-
                 </div>
-
-
 
                 <hr />
 
-
-
                 <div className="flex justify-between text-base font-semibold">
-
-
 
                   <span>
 
                     Total
 
                   </span>
-
-
 
                   <span>
 
@@ -1575,19 +1456,13 @@ export default function ListingPage() {
 
                   </span>
 
-
-
                 </div>
-
-
 
               </div>
 
             )}
 
-
-
-            {/* Reserve */}
+            {/***** Reserve *****/}
 
             <button
 
@@ -1618,10 +1493,12 @@ export default function ListingPage() {
             </button>
 
             <p className="mt-3 text-center text-xs text-gray-500">
+
               You won't be charged yet
+
             </p>
 
-            {/* Booking result */}
+            {/***** Booking result *****/}
 
             {bookingMessage && (
 
@@ -1649,63 +1526,91 @@ export default function ListingPage() {
 
             )}
 
-
-
           </aside>
 
-
-
         </div>
-
-
 
       </div>
 
-
-
       {toast && (
+
         <div className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-xl bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-xl">
+
           {toast}
+
         </div>
+
       )}
 
-      {/* Photo gallery modal */}
+      {/***** Photo gallery modal *****/}
+
       {showAllPhotos && (
+
         <div
+
           className="fixed inset-0 z-[80] overflow-y-auto bg-black/90 p-4 md:p-8"
+
           onClick={() => setShowAllPhotos(false)}
+
         >
+
           <div className="mx-auto max-w-5xl" onClick={(event) => event.stopPropagation()}>
+
             <div className="mb-5 flex items-center justify-between text-white">
+
               <h2 className="text-lg font-semibold">
+
                 {images.length} photos
+
               </h2>
+
               <button
+
                 onClick={() => setShowAllPhotos(false)}
+
                 className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-2xl transition hover:bg-white/20"
+
                 aria-label="Close photo gallery"
+
               >
+
                 ×
+
               </button>
+
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
+
               {images.map((image, index) => (
+
                 <img
+
                   key={image.id}
+
                   src={image.image_url}
+
                   alt={`${listing.title} photo ${index + 1}`}
+
                   loading={index === 0 ? "eager" : "lazy"}
+
                   decoding="async"
+
                   className="max-h-[70vh] w-full rounded-xl object-cover"
+
                 />
+
               ))}
+
             </div>
+
           </div>
+
         </div>
+
       )}
 
-      {/* Coming Soon Modal */}
+      {/***** Coming Soon Modal *****/}
 
       {showComingSoon && (
 
@@ -1725,23 +1630,17 @@ export default function ListingPage() {
 
           >
 
-
-
             <div className="text-5xl">
 
               🚧
 
             </div>
 
-
-
             <h2 className="mt-4 text-2xl font-semibold">
 
               Coming Soon
 
             </h2>
-
-
 
             <p className="mt-3 text-gray-500">
 
@@ -1750,8 +1649,6 @@ export default function ListingPage() {
               and will be available soon.
 
             </p>
-
-
 
             <button
 
@@ -1765,15 +1662,11 @@ export default function ListingPage() {
 
             </button>
 
-
-
           </div>
 
         </div>
 
       )}
-
-
 
     </main>
 

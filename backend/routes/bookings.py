@@ -16,6 +16,24 @@ def check_availability(
     check_out: date,
     db: Session = Depends(get_db),
 ):
+    if check_out <= check_in:
+        raise HTTPException(
+            status_code=400,
+            detail="Check-out must be after check-in",
+        )
+
+    listing = (
+        db.query(Listing)
+        .filter(Listing.id == listing_id)
+        .first()
+    )
+
+    if not listing:
+        raise HTTPException(
+            status_code=404,
+            detail="Listing not found",
+        )
+
     overlapping = (
         db.query(Booking)
         .filter(
@@ -27,7 +45,9 @@ def check_availability(
         .first()
     )
 
-    return {"available": overlapping is None}
+    return {
+        "available": overlapping is None
+    }
 
 
 @router.post("/")
@@ -39,23 +59,41 @@ def create_booking(
     guests: int,
     db: Session = Depends(get_db),
 ):
+    # Basic date validation
     if check_out <= check_in:
         raise HTTPException(
             status_code=400,
             detail="Check-out must be after check-in",
         )
 
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    # Guest validation
+    if guests < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one guest is required",
+        )
+
+    # Find listing
+    listing = (
+        db.query(Listing)
+        .filter(Listing.id == listing_id)
+        .first()
+    )
 
     if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Listing not found",
+        )
 
+    # Maximum guest validation
     if guests > listing.max_guests:
         raise HTTPException(
             status_code=400,
             detail="Too many guests for this listing",
         )
 
+    # Check overlapping confirmed bookings
     overlapping = (
         db.query(Booking)
         .filter(
@@ -73,11 +111,18 @@ def create_booking(
             detail="Listing is not available for these dates",
         )
 
+    # Calculate price
     nights = (check_out - check_in).days
+
     nightly_price = listing.price_per_night
     cleaning_fee = 500
     service_fee = nightly_price * nights * 0.12
-    total_price = nightly_price * nights + cleaning_fee + service_fee
+
+    total_price = (
+        nightly_price * nights
+        + cleaning_fee
+        + service_fee
+    )
 
     booking = Booking(
         listing_id=listing_id,
