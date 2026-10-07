@@ -3,6 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 type Listing = {
   id: number;
   title: string;
@@ -69,7 +72,7 @@ function CheckoutContent() {
     }
 
     fetch(
-      `http://127.0.0.1:8000/listings/${listingId}`
+      `${API_URL}/listings/${listingId}`
     )
       .then((response) => response.json())
       .then((data: ListingResponse) => {
@@ -187,7 +190,7 @@ function CheckoutContent() {
        * mock payment succeeds.
        */
       const bookingUrl =
-        `http://127.0.0.1:8000/bookings/` +
+        `${API_URL}/bookings/` +
         `?listing_id=${listingId}` +
         `&guest_id=${USER_ID}` +
         `&check_in=${checkIn}` +
@@ -205,7 +208,7 @@ function CheckoutContent() {
       if (!bookingResponse.ok) {
         setErrorMessage(
           bookingData.detail ||
-            "Booking could not be completed. The dates may no longer be available."
+          "Booking could not be completed. The dates may no longer be available."
         );
 
         setPaymentLoading(false);
@@ -351,11 +354,10 @@ function CheckoutContent() {
                   onClick={() =>
                     setPaymentMethod("upi")
                   }
-                  className={`flex w-full cursor-pointer items-center justify-between border-b p-5 text-left transition ${
-                    paymentMethod === "upi"
-                      ? "bg-gray-50"
-                      : "hover:bg-gray-50"
-                  }`}
+                  className={`flex w-full cursor-pointer items-center justify-between border-b p-5 text-left transition ${paymentMethod === "upi"
+                    ? "bg-gray-50"
+                    : "hover:bg-gray-50"
+                    }`}
                 >
 
                   <div className="flex items-center gap-4">
@@ -489,8 +491,8 @@ function CheckoutContent() {
                     {paymentLoading
                       ? "Processing payment..."
                       : `Pay ₹${Math.round(
-                          totalPrice
-                        ).toLocaleString()}`}
+                        totalPrice
+                      ).toLocaleString()}`}
                   </button>
 
                   <p className="mt-3 text-center text-xs text-gray-500">

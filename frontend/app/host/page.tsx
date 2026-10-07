@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const HOST_ID = 1;
 
 const AMENITY_OPTIONS = [
@@ -365,9 +366,9 @@ export default function HostPage() {
 
   const averagePrice = listings.length
     ? Math.round(
-        listings.reduce((sum, listing) => sum + listing.price_per_night, 0) /
-          listings.length
-      )
+      listings.reduce((sum, listing) => sum + listing.price_per_night, 0) /
+      listings.length
+    )
     : 0;
 
   function listingTitle(listingId: number) {

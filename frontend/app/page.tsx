@@ -1,12 +1,11 @@
 "use client";
 
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Listing = {
 
@@ -43,17 +42,10 @@ type GuestCounts = {
 
 };
 
-
-
 type SearchPanel = "where" | "when" | "who" | null;
 
 
-
-const API_URL = "http://127.0.0.1:8000";
-
 const GUEST_ID = 3;
-
-
 
 const categories = [
 
@@ -700,9 +692,9 @@ export default function Home() {
 
           ? current.filter(
 
-              (id) => id !== listingId
+            (id) => id !== listingId
 
-            )
+          )
 
           : [...current, listingId]
 
@@ -890,7 +882,7 @@ export default function Home() {
 
       Number(minPrice) >
 
-        Number(maxPrice)
+      Number(maxPrice)
 
     ) {
 
@@ -1190,31 +1182,25 @@ export default function Home() {
 
                   }
 
-                  className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm transition ${
-
-                    disabled
+                  className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm transition ${disabled
 
                       ? "cursor-not-allowed text-gray-300"
 
                       : "cursor-pointer hover:bg-gray-100"
 
-                  } ${
-
-                    selected
+                    } ${selected
 
                       ? "bg-gray-900 text-white hover:bg-gray-900"
 
                       : ""
 
-                  } ${
-
-                    inRange
+                    } ${inRange
 
                       ? "rounded-none bg-gray-100 text-gray-900"
 
                       : ""
 
-                  }`}
+                    }`}
 
                 >
 
@@ -1283,11 +1269,10 @@ export default function Home() {
 
 
             <div
-              className={`hidden items-center gap-8 md:flex transition-all duration-300 ease-out ${
-                isCompactHeader
+              className={`hidden items-center gap-8 md:flex transition-all duration-300 ease-out ${isCompactHeader
                   ? "pointer-events-none scale-95 opacity-0"
                   : "scale-100 opacity-100"
-              }`}
+                }`}
             >
 
               <button className="flex cursor-pointer flex-col items-center gap-1 border-b-2 border-gray-900 pb-2 text-sm font-semibold">
@@ -1498,11 +1483,10 @@ export default function Home() {
 
             ref={searchRef}
 
-            className={`relative mx-auto max-w-4xl overflow-hidden transition-[max-height,opacity,transform,margin] duration-300 ease-out ${
-              isCompactHeader
+            className={`relative mx-auto max-w-4xl overflow-hidden transition-[max-height,opacity,transform,margin] duration-300 ease-out ${isCompactHeader
                 ? "pointer-events-none mb-0 max-h-0 -translate-y-2 opacity-0"
                 : "mb-5 max-h-28 translate-y-0 opacity-100"
-            }`}
+              }`}
 
           >
 
@@ -1520,15 +1504,13 @@ export default function Home() {
 
                 }
 
-                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
-
-                  activePanel === "where"
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${activePanel === "where"
 
                     ? "bg-white shadow-lg"
 
                     : "hover:bg-gray-100"
 
-                }`}
+                  }`}
 
               >
 
@@ -1568,15 +1550,13 @@ export default function Home() {
 
                 }
 
-                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
-
-                  activePanel === "when"
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${activePanel === "when"
 
                     ? "bg-white shadow-lg"
 
                     : "hover:bg-gray-100"
 
-                }`}
+                  }`}
 
               >
 
@@ -1596,13 +1576,13 @@ export default function Home() {
 
                       ? `${formatDate(
 
-                          checkIn
+                        checkIn
 
-                        )} – ${formatDate(
+                      )} – ${formatDate(
 
-                          checkOut
+                        checkOut
 
-                        )}`
+                      )}`
 
                       : formatDate(checkIn)
 
@@ -1630,15 +1610,13 @@ export default function Home() {
 
                 }
 
-                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
-
-                  activePanel === "who"
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${activePanel === "who"
 
                     ? "bg-white shadow-lg"
 
                     : "hover:bg-gray-100"
 
-                }`}
+                  }`}
 
               >
 
@@ -2008,15 +1986,13 @@ export default function Home() {
 
                     key={item.key}
 
-                    className={`flex items-center justify-between py-5 ${
-
-                      index !== 3
+                    className={`flex items-center justify-between py-5 ${index !== 3
 
                         ? "border-b"
 
                         : ""
 
-                    }`}
+                      }`}
 
                   >
 
@@ -2162,15 +2138,13 @@ export default function Home() {
 
                 }}
 
-                className={`flex min-w-fit cursor-pointer flex-col items-center gap-1 border-b-2 pb-2 text-xs transition ${
-
-                  index === 0
+                className={`flex min-w-fit cursor-pointer flex-col items-center gap-1 border-b-2 pb-2 text-xs transition ${index === 0
 
                     ? "border-gray-900 font-semibold"
 
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-900"
 
-                }`}
+                  }`}
 
               >
 
@@ -2561,15 +2535,15 @@ export default function Home() {
         ) : isMapView ? (
           <div className="h-[70vh] w-full rounded-2xl bg-gray-100 overflow-hidden relative shadow-inner border mb-12">
             <div className="absolute inset-0 z-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=India&zoom=5&size=1200x800&scale=2&maptype=roadmap&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|element:labels|visibility:off&style=feature:administrative|element:geometry.stroke|color:0xcbd1d1&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9')] bg-cover bg-center opacity-80 mix-blend-multiply"></div>
-            
+
             {listings.map((listing, i) => (
-              <div 
+              <div
                 key={listing.id}
                 onClick={() => openListing(listing.id)}
                 className="absolute z-10 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform shadow-lg hover:z-50"
-                style={{ 
-                  top: `${15 + (i * 17) % 70}%`, 
-                  left: `${20 + (i * 31) % 60}%` 
+                style={{
+                  top: `${15 + (i * 17) % 70}%`,
+                  left: `${20 + (i * 31) % 60}%`
                 }}
               >
                 <div className="bg-white px-3 py-1.5 rounded-2xl shadow-md text-sm font-bold flex items-center hover:bg-black hover:text-white transition-colors border border-gray-200">
@@ -2653,7 +2627,7 @@ export default function Home() {
 
                         cardIndexes[
 
-                          listing.id
+                        listing.id
 
                         ] || 0;
 
@@ -2671,7 +2645,7 @@ export default function Home() {
 
                       const rating =
                         listing.rating !== null &&
-                        listing.rating !== undefined
+                          listing.rating !== undefined
                           ? listing.rating.toFixed(1)
                           : "New";
 
@@ -2719,13 +2693,13 @@ export default function Home() {
 
                               0 && (
 
-                              <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm">
+                                <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm">
 
-                                Guest favourite
+                                  Guest favourite
 
-                              </span>
+                                </span>
 
-                            )}
+                              )}
 
 
 
@@ -2776,11 +2750,11 @@ export default function Home() {
                               ) =>
 
                                 changeCardImage(
-                                    event,
-                                    listing.id,
-                                    -1,
-                                    imageUrls.length
-                                  )
+                                  event,
+                                  listing.id,
+                                  -1,
+                                  imageUrls.length
+                                )
 
                               }
 
@@ -2803,11 +2777,11 @@ export default function Home() {
                               ) =>
 
                                 changeCardImage(
-                                    event,
-                                    listing.id,
-                                    1,
-                                    imageUrls.length
-                                  )
+                                  event,
+                                  listing.id,
+                                  1,
+                                  imageUrls.length
+                                )
 
                               }
 
@@ -2825,29 +2799,27 @@ export default function Home() {
 
                               {imageUrls.map((_, dot) => (
 
-                                  <span
+                                <span
 
-                                    key={
+                                  key={
 
-                                      dot
+                                    dot
 
-                                    }
+                                  }
 
-                                    className={`h-1.5 w-1.5 rounded-full ${
-
-                                      dot ===
+                                  className={`h-1.5 w-1.5 rounded-full ${dot ===
 
                                       imageIndex
 
-                                        ? "bg-white"
+                                      ? "bg-white"
 
-                                        : "bg-white/50"
+                                      : "bg-white/50"
 
                                     }`}
 
-                                  />
+                                />
 
-                                )
+                              )
 
                               )}
 

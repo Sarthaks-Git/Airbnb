@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 type Image = {
 
   id: number;
@@ -134,7 +137,7 @@ export default function ListingPage() {
 
       const response = await fetch(
 
-        `http://127.0.0.1:8000/reviews/${id}`
+        `${API_URL}/reviews/${id}`
 
       );
 
@@ -164,7 +167,7 @@ export default function ListingPage() {
 
       const response = await fetch(
 
-        `http://127.0.0.1:8000/favorites/${data.listing.id}?user_id=${USER_ID}`,
+        `${API_URL}/favorites/${data.listing.id}?user_id=${USER_ID}`,
 
         { method: saved ? "DELETE" : "POST" }
 
@@ -230,7 +233,7 @@ export default function ListingPage() {
 
     fetch(
 
-      `http://127.0.0.1:8000/listings/${id}?\_=${Date.now()}`,
+      `${API_URL}/listings/${id}?\_=${Date.now()}`,
 
       {
 
@@ -348,7 +351,7 @@ export default function ListingPage() {
 
       const availabilityUrl =
 
-        `http://127.0.0.1:8000/bookings/availability` +
+        `${API_URL}/bookings/availability` +
 
         `?listing_id=${listing.id}` +
 
@@ -410,11 +413,11 @@ export default function ListingPage() {
 
         `/checkout?listing_id=${listing.id}` +
 
-          `&check_in=${checkIn}` +
+        `&check_in=${checkIn}` +
 
-          `&check_out=${checkOut}` +
+        `&check_out=${checkOut}` +
 
-          `&guests=${guests}`
+        `&guests=${guests}`
 
       );
 
@@ -470,7 +473,7 @@ export default function ListingPage() {
 
       const response = await fetch(
 
-        `http://127.0.0.1:8000/reviews/?${params.toString()}`,
+        `${API_URL}/reviews/?${params.toString()}`,
 
         {
 
@@ -634,11 +637,11 @@ export default function ListingPage() {
 
       ? reviews.reduce(
 
-          (sum, review) => sum + review.rating,
+        (sum, review) => sum + review.rating,
 
-          0
+        0
 
-        ) / reviews.length
+      ) / reviews.length
 
       : 0;
 
@@ -860,11 +863,9 @@ export default function ListingPage() {
 
                     decoding="async"
 
-                    className={`h-full w-full object-cover ${
+                    className={`h-full w-full object-cover ${index === 1 ? "rounded-tr-2xl" : ""
 
-                      index === 1 ? "rounded-tr-2xl" : ""
-
-                    } ${index === 3 ? "rounded-br-2xl" : ""}`}
+                      } ${index === 3 ? "rounded-br-2xl" : ""}`}
 
                   />
 
@@ -1504,19 +1505,17 @@ export default function ListingPage() {
 
               <div
 
-                className={`mt-4 rounded-lg p-3 text-center text-sm font-medium ${
+                className={`mt-4 rounded-lg p-3 text-center text-sm font-medium ${bookingMessage.startsWith(
 
-                  bookingMessage.startsWith(
+                  "Booking confirmed"
 
-                    "Booking confirmed"
-
-                  )
+                )
 
                     ? "bg-green-50 text-green-700"
 
                     : "bg-red-50 text-red-600"
 
-                }`}
+                  }`}
 
               >
 

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 type FavoriteListing = {
   id: number;
   title: string;
@@ -21,7 +24,7 @@ export default function WishlistsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/favorites/?user_id=${GUEST_ID}`)
+    fetch(`${API_URL}/favorites/?user_id=${GUEST_ID}`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -39,7 +42,7 @@ export default function WishlistsPage() {
     e.stopPropagation();
     try {
       await fetch(
-        `http://127.0.0.1:8000/favorites/${listingId}?user_id=${GUEST_ID}`,
+        `${API_URL}/favorites/${listingId}?user_id=${GUEST_ID}`,
         { method: "DELETE" }
       );
       setFavorites((prev) => prev.filter((item) => item.id !== listingId));
