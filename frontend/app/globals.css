@@ -26,13 +26,9 @@ body {
   color: #f9fafb;
 }
 
-/* White backgrounds */
-
 .dark .bg-white {
   background-color: #1f2937 !important;
 }
-
-/* Gray backgrounds */
 
 .dark .bg-gray-50 {
   background-color: #111827 !important;
@@ -41,8 +37,6 @@ body {
 .dark .bg-gray-100 {
   background-color: #374151 !important;
 }
-
-/* Text */
 
 .dark .text-gray-900 {
   color: #f9fafb !important;
@@ -64,8 +58,6 @@ body {
   color: #9ca3af !important;
 }
 
-/* Borders */
-
 .dark .border {
   border-color: #374151 !important;
 }
@@ -82,8 +74,6 @@ body {
   border-color: #374151 !important;
 }
 
-/* Inputs */
-
 .dark input,
 .dark select,
 .dark textarea {
@@ -97,14 +87,10 @@ body {
   color: #9ca3af;
 }
 
-/* Select options */
-
 .dark option {
   background-color: #1f2937;
   color: #f9fafb;
 }
-
-/* Common hover backgrounds */
 
 .dark .hover\:bg-gray-50:hover {
   background-color: #374151 !important;
@@ -114,15 +100,11 @@ body {
   background-color: #374151 !important;
 }
 
-/* Shadows */
-
 .dark .shadow-sm,
 .dark .shadow-md,
 .dark .shadow-lg {
   --tw-shadow-color: rgb(0 0 0 / 0.4);
 }
-
-/* Green booking confirmation */
 
 .dark .bg-green-50 {
   background-color: #052e16 !important;
@@ -132,8 +114,6 @@ body {
   color: #86efac !important;
 }
 
-/* Red error message */
-
 .dark .bg-red-50 {
   background-color: #450a0a !important;
 }
@@ -142,29 +122,13 @@ body {
   color: #fca5a5 !important;
 }
 
-/* Status badges */
-
 .dark .bg-green-100 {
   background-color: #14532d !important;
 }
 
-.dark .bg-gray-100 {
-  background-color: #374151 !important;
-}
-
-/* Smooth theme transition */
-
-body,
-button,
-input,
-select,
-textarea,
-div,
-section,
-aside,
-nav {
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
-}
+/*
+  Intentionally no global transition on div/section/nav/etc.
+  Broad transitions make large pages feel sluggish because every
+  element becomes a transition target. Individual UI elements keep
+  their own targeted transitions where they are useful.
+*/

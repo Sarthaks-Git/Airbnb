@@ -1,7 +1,10 @@
-"use client";
+ "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const API_URL = "http://127.0.0.1:8000";
+const HOST_ID = 1;
 
 type Listing = {
   id: number;
@@ -29,53 +32,96 @@ type Booking = {
   status: string;
 };
 
-const HOST_ID = 1;
+type FormState = {
+  title: string;
+  description: string;
+  location: string;
+  property_type: string;
+  price_per_night: string;
+  max_guests: string;
+  bedrooms: string;
+  beds: string;
+  bathrooms: string;
+  image_url: string;
+};
+
+const emptyForm: FormState = {
+  title: "",
+  description: "",
+  location: "",
+  property_type: "Apartment",
+  price_per_night: "",
+  max_guests: "2",
+  bedrooms: "1",
+  beds: "1",
+  bathrooms: "1",
+  image_url: "",
+};
 
 export default function HostPage() {
+  const router = useRouter();
+
   const [listings, setListings] = useState<Listing[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [propertyType, setPropertyType] = useState("Apartment");
-  const [price, setPrice] = useState("");
-  const [maxGuests, setMaxGuests] = useState("");
-  const [bedrooms, setBedrooms] = useState("");
-  const [beds, setBeds] = useState("");
-  const [bathrooms, setBathrooms] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">(
+    "success"
+  );
+
+  const [listingImages, setListingImages] = useState<Record<number, string>>(
+    {}
+  );
 
   async function loadDashboard() {
     setLoading(true);
 
     try {
-      const [listingResponse, bookingResponse] =
-        await Promise.all([
-          fetch(
-            `http://127.0.0.1:8000/host/listings?host_id=${HOST_ID}`
-          ),
-          fetch(
-            `http://127.0.0.1:8000/host/bookings?host_id=${HOST_ID}`
-          ),
-        ]);
+      const [listingResponse, bookingResponse] = await Promise.all([
+        fetch(`${API_URL}/host/listings?host_id=${HOST_ID}`),
+        fetch(`${API_URL}/host/bookings?host_id=${HOST_ID}`),
+      ]);
+
+      if (!listingResponse.ok || !bookingResponse.ok) {
+        throw new Error("Unable to load host dashboard");
+      }
 
       const listingData = await listingResponse.json();
       const bookingData = await bookingResponse.json();
 
-      setListings(listingData);
-      setBookings(bookingData);
-    } catch (error) {
-      console.error(
-        "Failed to load host dashboard:",
-        error
+      setListings(listingData || []);
+      setBookings(bookingData || []);
+
+      const imageEntries = await Promise.all(
+        (listingData || []).map(async (listing: Listing) => {
+          try {
+            const response = await fetch(
+              `${API_URL}/listings/${listing.id}`
+            );
+
+            if (!response.ok) return [listing.id, ""] as const;
+
+            const data = await response.json();
+            return [
+              listing.id,
+              data.images?.[0]?.image_url || "",
+            ] as const;
+          } catch {
+            return [listing.id, ""] as const;
+          }
+        })
       );
+
+      setListingImages(Object.fromEntries(imageEntries));
+    } catch (error) {
+      console.error(error);
+      showMessage("Unable to load the host dashboard.", "error");
     } finally {
       setLoading(false);
     }
@@ -85,791 +131,784 @@ export default function HostPage() {
     loadDashboard();
   }, []);
 
-  function resetForm() {
-    setTitle("");
-    setDescription("");
-    setLocation("");
-    setPropertyType("Apartment");
-    setPrice("");
-    setMaxGuests("");
-    setBedrooms("");
-    setBeds("");
-    setBathrooms("");
-    setImageUrl("");
-    setEditingId(null);
-    setShowForm(false);
+  function showMessage(
+    text: string,
+    type: "success" | "error" = "success"
+  ) {
+    setMessage(text);
+    setMessageType(type);
+
+    window.setTimeout(() => {
+      setMessage("");
+    }, 3000);
   }
 
-  function startEditing(listing: Listing) {
+  function updateField(
+    field: keyof FormState,
+    value: string
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  }
+
+  function openEdit(listing: Listing) {
     setEditingId(listing.id);
 
-    setTitle(listing.title);
-    setDescription(listing.description);
-    setLocation(listing.location);
-    setPropertyType(listing.property_type);
-    setPrice(String(listing.price_per_night));
-    setMaxGuests(String(listing.max_guests));
-    setBedrooms(String(listing.bedrooms));
-    setBeds(String(listing.beds));
-    setBathrooms(String(listing.bathrooms));
+    setForm({
+      title: listing.title,
+      description: listing.description,
+      location: listing.location,
+      property_type: listing.property_type,
+      price_per_night: String(listing.price_per_night),
+      max_guests: String(listing.max_guests),
+      bedrooms: String(listing.bedrooms),
+      beds: String(listing.beds),
+      bathrooms: String(listing.bathrooms),
+      image_url: listingImages[listing.id] || "",
+    });
 
     setShowForm(true);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  function closeForm() {
+    if (saving) return;
+
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (
-      !title ||
-      !description ||
-      !location ||
-      !price ||
-      !maxGuests ||
-      !bedrooms ||
-      !beds ||
-      !bathrooms
+      !form.title.trim() ||
+      !form.description.trim() ||
+      !form.location.trim() ||
+      !form.price_per_night
     ) {
-      alert("Please fill in all required fields.");
+      showMessage("Please fill in all required fields.", "error");
       return;
     }
 
     setSaving(true);
 
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({
+        ...(editingId
+          ? {}
+          : {
+              host_id: String(HOST_ID),
+            }),
+        title: form.title.trim(),
+        description: form.description.trim(),
+        location: form.location.trim(),
+        property_type: form.property_type,
+        price_per_night: form.price_per_night,
+        max_guests: form.max_guests,
+        bedrooms: form.bedrooms,
+        beds: form.beds,
+        bathrooms: form.bathrooms,
+      });
 
-      params.append("host_id", String(HOST_ID));
-      params.append("title", title);
-      params.append("description", description);
-      params.append("location", location);
-      params.append("property_type", propertyType);
-      params.append("price_per_night", price);
-      params.append("max_guests", maxGuests);
-      params.append("bedrooms", bedrooms);
-      params.append("beds", beds);
-      params.append("bathrooms", bathrooms);
+      let response: Response;
 
-      if (imageUrl.trim() && editingId === null) {
-        params.append(
-          "image_urls",
-          imageUrl.trim()
+      if (editingId) {
+        response = await fetch(
+          `${API_URL}/host/listings/${editingId}?host_id=${HOST_ID}&${params.toString()}`,
+          {
+            method: "PUT",
+          }
+        );
+      } else {
+        const createParams = new URLSearchParams({
+          host_id: String(HOST_ID),
+          title: form.title.trim(),
+          description: form.description.trim(),
+          location: form.location.trim(),
+          property_type: form.property_type,
+          price_per_night: form.price_per_night,
+          max_guests: form.max_guests,
+          bedrooms: form.bedrooms,
+          beds: form.beds,
+          bathrooms: form.bathrooms,
+        });
+
+        if (form.image_url.trim()) {
+          createParams.set("image_urls", form.image_url.trim());
+        }
+
+        response = await fetch(
+          `${API_URL}/host/listings?${createParams.toString()}`,
+          {
+            method: "POST",
+          }
         );
       }
-
-      const url =
-        editingId === null
-          ? "http://127.0.0.1:8000/host/listings"
-          : `http://127.0.0.1:8000/host/listings/${editingId}`;
-
-      const response = await fetch(
-        `${url}?${params.toString()}`,
-        {
-          method:
-            editingId === null
-              ? "POST"
-              : "PUT",
-        }
-      );
-
-      const data = await response.json();
 
       if (!response.ok) {
-        console.error(
-          "Listing save failed:",
-          data
+        const result = await response.json().catch(() => null);
+        throw new Error(
+          result?.detail || "Unable to save listing."
         );
-
-        alert(
-          data.detail ||
-            "Failed to save listing."
-        );
-
-        return;
       }
 
-      alert(
-        editingId === null
-          ? "Listing created successfully!"
-          : "Listing updated successfully!"
+      closeForm();
+
+      showMessage(
+        editingId
+          ? "Listing updated successfully."
+          : "Listing created successfully."
       );
 
-      resetForm();
       await loadDashboard();
     } catch (error) {
-      console.error(
-        "Failed to save listing:",
-        error
-      );
-
-      alert(
-        "Something went wrong. Please try again."
+      console.error(error);
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save listing.",
+        "error"
       );
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteListing(
-    listingId: number
-  ) {
+  async function handleDelete(listingId: number) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this listing?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/host/listings/${listingId}?host_id=${HOST_ID}`,
+        `${API_URL}/host/listings/${listingId}?host_id=${HOST_ID}`,
         {
           method: "DELETE",
         }
       );
 
-      const data = await response.json();
-
       if (!response.ok) {
-        alert(
-          data.detail ||
-            "Failed to delete listing."
+        const result = await response.json().catch(() => null);
+        throw new Error(
+          result?.detail || "Unable to delete listing."
         );
-        return;
       }
 
+      showMessage("Listing deleted successfully.");
       await loadDashboard();
     } catch (error) {
-      console.error(
-        "Failed to delete listing:",
-        error
-      );
-
-      alert(
-        "Something went wrong while deleting the listing."
+      console.error(error);
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete listing.",
+        "error"
       );
     }
   }
 
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString(
-      "en-IN",
-      {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }
-    );
-  }
-
-  function getListingTitle(
-    listingId: number
-  ) {
-    return (
-      listings.find(
-        (listing) => listing.id === listingId
-      )?.title ||
-      `Listing #${listingId}`
-    );
-  }
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-white p-8">
-        <p className="text-gray-500">
-          Loading host dashboard...
-        </p>
-      </main>
-    );
-  }
+  const totalRevenue = bookings.reduce(
+    (sum, booking) => sum + Number(booking.total_price || 0),
+    0
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-
-      {/* Navbar */}
-      <nav className="flex items-center justify-between border-b bg-white px-8 py-5">
-
-        <Link
-          href="/"
-          className="cursor-pointer text-2xl font-bold text-red-500 transition hover:opacity-80"
-        >
-          airbnb
-        </Link>
-
-        <div className="flex items-center gap-6 text-sm">
-
-          <Link
-            href="/"
-            className="cursor-pointer font-medium hover:underline"
+      <header className="sticky top-0 z-40 border-b bg-white">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-4">
+          <button
+            onClick={() => router.push("/")}
+            className="cursor-pointer text-2xl font-bold tracking-tight text-[#ff385c]"
           >
-            Explore
-          </Link>
+            airbnb
+          </button>
 
-          <Link
-            href="/trips"
-            className="cursor-pointer font-medium hover:underline"
-          >
-            Trips
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push("/")}
+              className="cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition hover:bg-gray-100"
+            >
+              Explore
+            </button>
 
-          <span className="font-semibold">
-            Host dashboard
-          </span>
+            <button
+              onClick={() => router.push("/trips")}
+              className="cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition hover:bg-gray-100"
+            >
+              Trips
+            </button>
 
+            <button
+              onClick={openCreate}
+              className="hidden cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition hover:bg-gray-100 sm:block"
+            >
+              Airbnb your home
+            </button>
+
+            <div className="ml-1 flex h-10 w-10 items-center justify-center rounded-full border bg-green-100 text-sm font-semibold text-green-700">
+              S
+            </div>
+          </div>
         </div>
+      </header>
 
-      </nav>
+      {message && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-xl ${
+            messageType === "error"
+              ? "bg-red-600"
+              : "bg-gray-900"
+          }`}
+        >
+          {message}
+        </div>
+      )}
 
-      {/* Dashboard */}
-      <section className="mx-auto max-w-6xl px-6 py-10">
-
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
+      <div className="mx-auto max-w-[1440px] px-6 py-10">
+        <section className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
-            <h1 className="text-3xl font-semibold">
+            <p className="text-sm font-medium text-gray-500">
               Host dashboard
+            </p>
+
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+              Welcome back, Sarthak
             </h1>
 
             <p className="mt-2 text-gray-500">
-              Manage your properties and bookings.
+              Manage your homes and keep track of your reservations.
             </p>
           </div>
 
           <button
-            onClick={() => {
-              if (showForm) {
-                resetForm();
-              } else {
-                setShowForm(true);
-              }
-            }}
-            className="cursor-pointer rounded-lg bg-red-500 px-5 py-3 font-semibold text-white transition hover:bg-red-600"
+            onClick={openCreate}
+            className="cursor-pointer rounded-full bg-[#ff385c] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#e31c5f]"
           >
-            {showForm
-              ? "Cancel"
-              : "+ Add listing"}
+            + Create a listing
           </button>
+        </section>
 
-        </div>
+        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Listings", listings.length, "Homes you host"],
+            ["Bookings", bookings.length, "Reservations received"],
+            [
+              "Revenue",
+              `₹${Math.round(totalRevenue).toLocaleString("en-IN")}`,
+              "Total booking value",
+            ],
+            [
+              "Avg. price",
+              listings.length
+                ? `₹${Math.round(
+                    listings.reduce(
+                      (sum, item) =>
+                        sum + item.price_per_night,
+                      0
+                    ) / listings.length
+                  ).toLocaleString("en-IN")}`
+                : "₹0",
+              "Per night",
+            ],
+          ].map(([label, value, subtitle]) => (
+            <div
+              key={label}
+              className="rounded-2xl border bg-white p-5 shadow-sm"
+            >
+              <p className="text-sm text-gray-500">{label}</p>
+              <p className="mt-2 text-2xl font-semibold">
+                {value}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {subtitle}
+              </p>
+            </div>
+          ))}
+        </section>
 
-        {/* Create / Edit form */}
-        {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="mt-8 rounded-2xl border bg-white p-6 shadow-sm"
-          >
+        <section className="mt-10">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">
+                Your listings
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Create, edit, or manage your properties.
+              </p>
+            </div>
 
-            <h2 className="text-xl font-semibold">
-              {editingId === null
-                ? "Create a new listing"
-                : "Edit listing"}
-            </h2>
+            <span className="rounded-full bg-white px-4 py-2 text-sm font-medium shadow-sm ring-1 ring-gray-200">
+              {listings.length}{" "}
+              {listings.length === 1 ? "listing" : "listings"}
+            </span>
+          </div>
 
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
-
-              {/* Title */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-semibold">
-                  Title
-                </label>
-
-                <input
-                  value={title}
-                  onChange={(event) =>
-                    setTitle(event.target.value)
-                  }
-                  placeholder="Modern apartment in Mumbai"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-semibold">
-                  Description
-                </label>
-
-                <textarea
-                  value={description}
-                  onChange={(event) =>
-                    setDescription(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Describe your property..."
-                  rows={4}
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Location
-                </label>
-
-                <input
-                  value={location}
-                  onChange={(event) =>
-                    setLocation(event.target.value)
-                  }
-                  placeholder="Mumbai, Maharashtra"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Property type */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Property type
-                </label>
-
-                <select
-                  value={propertyType}
-                  onChange={(event) =>
-                    setPropertyType(
-                      event.target.value
-                    )
-                  }
-                  className="mt-2 w-full cursor-pointer rounded-lg border bg-white p-3 outline-none focus:border-red-500"
+          {loading ? (
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border bg-white p-4">
+                  <div className="h-52 animate-pulse rounded-xl bg-gray-200" />
+                  <div className="mt-4 h-5 w-3/4 animate-pulse rounded bg-gray-200" />
+                  <div className="mt-3 h-4 w-1/2 animate-pulse rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          ) : listings.length === 0 ? (
+            <div className="rounded-3xl border border-dashed bg-white px-6 py-20 text-center">
+              <div className="text-5xl">🏡</div>
+              <h3 className="mt-5 text-xl font-semibold">
+                You have no listings yet
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+                Create your first property and start hosting
+                guests.
+              </p>
+              <button
+                onClick={openCreate}
+                className="mt-6 cursor-pointer rounded-full bg-black px-6 py-3 text-sm font-semibold text-white"
+              >
+                Create your first listing
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {listings.map((listing) => (
+                <article
+                  key={listing.id}
+                  className="overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <option value="Apartment">
-                    Apartment
-                  </option>
+                  <div className="relative h-56 overflow-hidden bg-gray-100">
+                    {listingImages[listing.id] ? (
+                      <img
+                        src={listingImages[listing.id]}
+                        alt={listing.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-5xl">
+                        🏡
+                      </div>
+                    )}
 
-                  <option value="Villa">
-                    Villa
-                  </option>
+                    <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm">
+                      {listing.property_type}
+                    </span>
+                  </div>
 
-                  <option value="House">
-                    House
-                  </option>
-                </select>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold">
+                          {listing.title}
+                        </h3>
+                        <p className="mt-1 truncate text-sm text-gray-500">
+                          {listing.location}
+                        </p>
+                      </div>
+
+                      <p className="shrink-0 text-sm">
+                        <span className="font-semibold">
+                          ₹
+                          {listing.price_per_night.toLocaleString(
+                            "en-IN"
+                          )}
+                        </span>{" "}
+                        / night
+                      </p>
+                    </div>
+
+                    <p className="mt-3 text-sm text-gray-500">
+                      {listing.max_guests} guests ·{" "}
+                      {listing.bedrooms} bedrooms ·{" "}
+                      {listing.beds} beds ·{" "}
+                      {listing.bathrooms} bathrooms
+                    </p>
+
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() =>
+                          window.open(
+                            `/listings/${listing.id}`,
+                            "_blank"
+                          )
+                        }
+                        className="flex-1 cursor-pointer rounded-full border px-4 py-2.5 text-sm font-semibold transition hover:bg-gray-50"
+                      >
+                        View
+                      </button>
+
+                      <button
+                        onClick={() => openEdit(listing)}
+                        className="flex-1 cursor-pointer rounded-full border px-4 py-2.5 text-sm font-semibold transition hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(listing.id)}
+                        className="cursor-pointer rounded-full border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-12">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold">
+              Recent bookings
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Reservations made for your properties.
+            </p>
+          </div>
+
+          {bookings.length === 0 ? (
+            <div className="rounded-2xl border bg-white p-8 text-center text-sm text-gray-500">
+              No bookings yet.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="border-b bg-gray-50">
+                    <tr>
+                      <th className="px-5 py-4 font-semibold">
+                        Listing
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Dates
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Guests
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Nights
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Total
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {bookings.map((booking) => {
+                      const listing = listings.find(
+                        (item) => item.id === booking.listing_id
+                      );
+
+                      return (
+                        <tr
+                          key={booking.id}
+                          className="border-b last:border-0"
+                        >
+                          <td className="px-5 py-4 font-medium">
+                            {listing?.title ||
+                              `Listing #${booking.listing_id}`}
+                          </td>
+
+                          <td className="px-5 py-4 text-gray-600">
+                            {booking.check_in} →{" "}
+                            {booking.check_out}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {booking.guests}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {booking.nights}
+                          </td>
+
+                          <td className="px-5 py-4 font-semibold">
+                            ₹
+                            {Math.round(
+                              booking.total_price
+                            ).toLocaleString("en-IN")}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                              {booking.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </div>
+          )}
+        </section>
+      </div>
 
-              {/* Price */}
+      {showForm && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeForm();
+            }
+          }}
+        >
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <label className="text-sm font-semibold">
-                  Price per night
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={price}
-                  onChange={(event) =>
-                    setPrice(event.target.value)
-                  }
-                  placeholder="4500"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
+                <p className="text-sm font-medium text-gray-500">
+                  Host tools
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold">
+                  {editingId
+                    ? "Edit your listing"
+                    : "Create a new listing"}
+                </h2>
               </div>
 
-              {/* Max guests */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Maximum guests
-                </label>
+              <button
+                onClick={closeForm}
+                className="cursor-pointer rounded-full px-3 py-2 text-xl transition hover:bg-gray-100"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
 
-                <input
-                  type="number"
-                  min="1"
-                  value={maxGuests}
-                  onChange={(event) =>
-                    setMaxGuests(
-                      event.target.value
-                    )
-                  }
-                  placeholder="4"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Bedrooms */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Bedrooms
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={bedrooms}
-                  onChange={(event) =>
-                    setBedrooms(
-                      event.target.value
-                    )
-                  }
-                  placeholder="2"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Beds */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Beds
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={beds}
-                  onChange={(event) =>
-                    setBeds(event.target.value)
-                  }
-                  placeholder="2"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Bathrooms */}
-              <div>
-                <label className="text-sm font-semibold">
-                  Bathrooms
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={bathrooms}
-                  onChange={(event) =>
-                    setBathrooms(
-                      event.target.value
-                    )
-                  }
-                  placeholder="2"
-                  className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
-                />
-              </div>
-
-              {/* Image */}
-              {editingId === null && (
-                <div>
-                  <label className="text-sm font-semibold">
-                    Image URL
-                  </label>
-
+            <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="md:col-span-2">
+                  <span className="text-sm font-semibold">
+                    Title
+                  </span>
                   <input
-                    type="url"
-                    value={imageUrl}
+                    value={form.title}
                     onChange={(event) =>
-                      setImageUrl(
+                      updateField("title", event.target.value)
+                    }
+                    placeholder="Beautiful lake house"
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
+
+                <label className="md:col-span-2">
+                  <span className="text-sm font-semibold">
+                    Description
+                  </span>
+                  <textarea
+                    value={form.description}
+                    onChange={(event) =>
+                      updateField(
+                        "description",
                         event.target.value
                       )
                     }
-                    placeholder="https://..."
-                    className="mt-2 w-full rounded-lg border p-3 outline-none focus:border-red-500"
+                    placeholder="Describe your place..."
+                    rows={4}
+                    className="mt-2 w-full resize-none rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
                   />
-                </div>
-              )}
+                </label>
 
-            </div>
+                <label>
+                  <span className="text-sm font-semibold">
+                    Location
+                  </span>
+                  <input
+                    value={form.location}
+                    onChange={(event) =>
+                      updateField(
+                        "location",
+                        event.target.value
+                      )
+                    }
+                    placeholder="Goa"
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-            <div className="mt-6 flex justify-end gap-3">
+                <label>
+                  <span className="text-sm font-semibold">
+                    Property type
+                  </span>
+                  <select
+                    value={form.property_type}
+                    onChange={(event) =>
+                      updateField(
+                        "property_type",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full cursor-pointer rounded-xl border bg-white px-4 py-3 outline-none"
+                  >
+                    <option value="Apartment">
+                      Apartment
+                    </option>
+                    <option value="Villa">Villa</option>
+                    <option value="House">House</option>
+                  </select>
+                </label>
 
-              <button
-                type="button"
-                onClick={resetForm}
-                className="cursor-pointer rounded-lg border px-5 py-3 font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
+                <label>
+                  <span className="text-sm font-semibold">
+                    Price per night
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.price_per_night}
+                    onChange={(event) =>
+                      updateField(
+                        "price_per_night",
+                        event.target.value
+                      )
+                    }
+                    placeholder="4500"
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="cursor-pointer rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving
-                  ? "Saving..."
-                  : editingId === null
-                    ? "Create listing"
-                    : "Save changes"}
-              </button>
+                <label>
+                  <span className="text-sm font-semibold">
+                    Maximum guests
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.max_guests}
+                    onChange={(event) =>
+                      updateField(
+                        "max_guests",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-            </div>
+                <label>
+                  <span className="text-sm font-semibold">
+                    Bedrooms
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.bedrooms}
+                    onChange={(event) =>
+                      updateField(
+                        "bedrooms",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-          </form>
-        )}
+                <label>
+                  <span className="text-sm font-semibold">
+                    Beds
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.beds}
+                    onChange={(event) =>
+                      updateField(
+                        "beds",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-        {/* Stats */}
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+                <label>
+                  <span className="text-sm font-semibold">
+                    Bathrooms
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.bathrooms}
+                    onChange={(event) =>
+                      updateField(
+                        "bathrooms",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                  />
+                </label>
 
-          <div className="rounded-xl border bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">
-              Your listings
-            </p>
-
-            <p className="mt-2 text-3xl font-semibold">
-              {listings.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">
-              Total bookings
-            </p>
-
-            <p className="mt-2 text-3xl font-semibold">
-              {bookings.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">
-              Confirmed bookings
-            </p>
-
-            <p className="mt-2 text-3xl font-semibold">
-              {
-                bookings.filter(
-                  (booking) =>
-                    booking.status ===
-                    "confirmed"
-                ).length
-              }
-            </p>
-          </div>
-
-        </div>
-
-        {/* Your listings */}
-        <section className="mt-10">
-
-          <h2 className="text-2xl font-semibold">
-            Your listings
-          </h2>
-
-          {listings.length === 0 ? (
-
-            <div className="mt-5 rounded-xl border bg-white p-10 text-center">
-
-              <h3 className="text-lg font-semibold">
-                You have no listings yet
-              </h3>
-
-              <p className="mt-2 text-gray-500">
-                Create your first property to start hosting.
-              </p>
-
-              <button
-                onClick={() =>
-                  setShowForm(true)
-                }
-                className="mt-5 cursor-pointer rounded-lg bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-600"
-              >
-                Create listing
-              </button>
-
-            </div>
-
-          ) : (
-
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
-
-              {listings.map((listing) => (
-
-                <div
-                  key={listing.id}
-                  className="rounded-xl border bg-white p-6 shadow-sm"
-                >
-
-                  <div className="flex items-start justify-between gap-4">
-
-                    <div>
-
-                      <h3 className="text-xl font-semibold">
-                        {listing.title}
-                      </h3>
-
-                      <p className="mt-1 text-sm text-gray-500">
-                        {listing.location}
-                      </p>
-
-                    </div>
-
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold">
-                      {listing.property_type}
+                {!editingId && (
+                  <label className="md:col-span-2">
+                    <span className="text-sm font-semibold">
+                      Cover image URL
                     </span>
-
-                  </div>
-
-                  <p className="mt-4 text-sm text-gray-600">
-                    {listing.max_guests} guests ·{" "}
-                    {listing.bedrooms} bedrooms ·{" "}
-                    {listing.beds} beds ·{" "}
-                    {listing.bathrooms} bathrooms
-                  </p>
-
-                  <p className="mt-4 text-lg font-semibold">
-                    ₹{listing.price_per_night.toLocaleString()}
-                    <span className="text-sm font-normal text-gray-500">
-                      {" "}per night
-                    </span>
-                  </p>
-
-                  <div className="mt-5 flex gap-3">
-
-                    <button
-                      onClick={() =>
-                        startEditing(listing)
-                      }
-                      className="cursor-pointer rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        deleteListing(listing.id)
-                      }
-                      className="cursor-pointer rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        window.open(
-                          `/listings/${listing.id}`,
-                          "_blank"
+                    <input
+                      type="url"
+                      value={form.image_url}
+                      onChange={(event) =>
+                        updateField(
+                          "image_url",
+                          event.target.value
                         )
                       }
-                      className="cursor-pointer rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50"
-                    >
-                      View
-                    </button>
+                      placeholder="https://..."
+                      className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition focus:border-gray-900"
+                    />
+                    <span className="mt-1 block text-xs text-gray-500">
+                      Paste a public image URL. Multiple images
+                      can be added later from the backend.
+                    </span>
+                  </label>
+                )}
+              </div>
 
-                  </div>
+              <div className="flex justify-end gap-3 border-t pt-5">
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="cursor-pointer rounded-full border px-6 py-3 text-sm font-semibold transition hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
 
-                </div>
-
-              ))}
-
-            </div>
-
-          )}
-
-        </section>
-
-        {/* Bookings */}
-        <section className="mt-12">
-
-          <h2 className="text-2xl font-semibold">
-            Guest bookings
-          </h2>
-
-          {bookings.length === 0 ? (
-
-            <div className="mt-5 rounded-xl border bg-white p-8 text-center text-gray-500">
-              No bookings for your properties yet.
-            </div>
-
-          ) : (
-
-            <div className="mt-5 overflow-x-auto rounded-xl border bg-white shadow-sm">
-
-              <table className="w-full min-w-[700px] text-left">
-
-                <thead className="border-b bg-gray-50">
-
-                  <tr>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Listing
-                    </th>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Check-in
-                    </th>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Check-out
-                    </th>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Guests
-                    </th>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Total
-                    </th>
-
-                    <th className="px-5 py-4 text-sm font-semibold">
-                      Status
-                    </th>
-
-                  </tr>
-
-                </thead>
-
-                <tbody>
-
-                  {bookings.map((booking) => (
-
-                    <tr
-                      key={booking.id}
-                      className="border-b last:border-b-0"
-                    >
-
-                      <td className="px-5 py-4 font-medium">
-                        {getListingTitle(
-                          booking.listing_id
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm">
-                        {formatDate(
-                          booking.check_in
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm">
-                        {formatDate(
-                          booking.check_out
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm">
-                        {booking.guests}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm font-semibold">
-                        ₹{booking.total_price.toLocaleString()}
-                      </td>
-
-                      <td className="px-5 py-4">
-
-                        <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold capitalize text-green-700">
-                          {booking.status}
-                        </span>
-
-                      </td>
-
-                    </tr>
-
-                  ))}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
-          )}
-
-        </section>
-
-      </section>
-
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="cursor-pointer rounded-full bg-[#ff385c] px-7 py-3 text-sm font-semibold text-white transition hover:bg-[#e31c5f] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving
+                    ? "Saving..."
+                    : editingId
+                    ? "Save changes"
+                    : "Create listing"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

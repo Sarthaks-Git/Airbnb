@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from dependencies import get_db
-from models import Listing, ListingImage, Booking, Amenity, ListingAmenity
+from models import (
+    Listing,
+    ListingImage,
+    Booking,
+    Amenity,
+    ListingAmenity,
+    Review,
+)
 
 router = APIRouter(prefix="/listings", tags=["Listings"])
 
@@ -24,19 +31,20 @@ def get_listings(
 ):
     query = db.query(Listing)
 
-    # Location filter
+    # -----------------------------
+    # Filters
+    # -----------------------------
+
     if location:
         query = query.filter(
             Listing.location.ilike(f"%{location}%")
         )
 
-    # Property type filter
     if property_type:
         query = query.filter(
             Listing.property_type == property_type
         )
 
-    # Price filters
     if min_price is not None:
         query = query.filter(
             Listing.price_per_night >= min_price
@@ -47,13 +55,15 @@ def get_listings(
             Listing.price_per_night <= max_price
         )
 
-    # Guest filter
     if guests is not None:
         query = query.filter(
             Listing.max_guests >= guests
         )
 
+    # -----------------------------
     # Date validation
+    # -----------------------------
+
     if check_in and check_out and check_out <= check_in:
         return {
             "items": [],
@@ -63,7 +73,10 @@ def get_listings(
             "error": "Check-out must be after check-in",
         }
 
-    # Availability filter
+    # -----------------------------
+    # Availability filtering
+    # -----------------------------
+
     if check_in and check_out:
         unavailable_listing_ids = (
             db.query(Booking.listing_id)
@@ -79,6 +92,10 @@ def get_listings(
             ~Listing.id.in_(unavailable_listing_ids)
         )
 
+    # -----------------------------
+    # Pagination
+    # -----------------------------
+
     total = query.count()
 
     listings = (
@@ -91,14 +108,51 @@ def get_listings(
     items = []
 
     for listing in listings:
-        image = (
+
+        # -----------------------------
+        # Get all listing images
+        # -----------------------------
+
+        images = (
             db.query(ListingImage)
             .filter(
                 ListingImage.listing_id == listing.id
             )
             .order_by(ListingImage.display_order)
-            .first()
+            .all()
         )
+
+        image_urls = [
+            image.image_url
+            for image in images
+        ]
+
+        # -----------------------------
+        # Get reviews
+        # -----------------------------
+
+        reviews = (
+            db.query(Review)
+            .filter(
+                Review.listing_id == listing.id
+            )
+            .all()
+        )
+
+        review_count = len(reviews)
+
+        if review_count > 0:
+            rating = round(
+                sum(review.rating for review in reviews)
+                / review_count,
+                1,
+            )
+        else:
+            rating = None
+
+        # -----------------------------
+        # Listing response
+        # -----------------------------
 
         items.append({
             "id": listing.id,
@@ -107,11 +161,20 @@ def get_listings(
             "price_per_night": listing.price_per_night,
             "property_type": listing.property_type,
             "max_guests": listing.max_guests,
+
+            # Keep this for existing frontend compatibility
             "image_url": (
-                image.image_url
-                if image
+                image_urls[0]
+                if image_urls
                 else None
             ),
+
+            # New real image collection
+            "image_urls": image_urls,
+
+            # Real review information
+            "rating": rating,
+            "review_count": review_count,
         })
 
     return {
@@ -134,7 +197,13 @@ def get_listing(
     )
 
     if not listing:
-        return {"error": "Listing not found"}
+        return {
+            "error": "Listing not found"
+        }
+
+    # -----------------------------
+    # Images
+    # -----------------------------
 
     images = (
         db.query(ListingImage)
@@ -144,6 +213,10 @@ def get_listing(
         .order_by(ListingImage.display_order)
         .all()
     )
+
+    # -----------------------------
+    # Amenities
+    # -----------------------------
 
     amenities = (
         db.query(Amenity)
@@ -157,8 +230,33 @@ def get_listing(
         .all()
     )
 
+    # -----------------------------
+    # Reviews
+    # -----------------------------
+
+    reviews = (
+        db.query(Review)
+        .filter(
+            Review.listing_id == listing_id
+        )
+        .all()
+    )
+
+    review_count = len(reviews)
+
+    if review_count > 0:
+        rating = round(
+            sum(review.rating for review in reviews)
+            / review_count,
+            1,
+        )
+    else:
+        rating = None
+
     return {
         "listing": listing,
         "images": images,
         "amenities": amenities,
+        "rating": rating,
+        "review_count": review_count,
     }

@@ -1,623 +1,3285 @@
 "use client";
 
-import { useEffect, useState } from "react";
+
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { useRouter } from "next/navigation";
 
+
+
 type Listing = {
+
   id: number;
+
   title: string;
+
   location: string;
+
   price_per_night: number;
+
   property_type: string;
+
   max_guests: number;
+
   image_url: string | null;
+  image_urls?: string[];
+  rating?: number | null;
+  review_count?: number;
+
 };
 
-const USER_ID = 3;
+
+
+type GuestCounts = {
+
+  adults: number;
+
+  children: number;
+
+  infants: number;
+
+  pets: number;
+
+};
+
+
+
+type SearchPanel = "where" | "when" | "who" | null;
+
+
+
+const API_URL = "http://127.0.0.1:8000";
+
+const GUEST_ID = 3;
+
+
+
+const categories = [
+
+  { icon: "🏠", label: "Homes" },
+
+  { icon: "🏖️", label: "Beach" },
+
+  { icon: "🏊", label: "Amazing pools" },
+
+  { icon: "🌆", label: "Amazing views" },
+
+  { icon: "🏡", label: "Countryside" },
+
+  { icon: "🏰", label: "Castles" },
+
+  { icon: "⛰️", label: "Mountain" },
+
+  { icon: "🛏️", label: "Rooms" },
+
+  { icon: "🌴", label: "Tropical" },
+
+];
+
+
+
+const destinations = [
+
+  "Bhopal",
+
+  "Mumbai",
+
+  "Goa",
+
+  "Udaipur",
+
+  "Jabalpur",
+
+  "Lucknow",
+
+  "Jaipur",
+
+  "Delhi",
+
+];
+
+
+
+const sections = [
+
+  "Explore stays",
+
+  "Popular homes",
+
+  "Unique stays",
+
+];
+
+
+
+function getToday() {
+
+  const today = new Date();
+
+
+
+  return `${today.getFullYear()}-${String(
+
+    today.getMonth() + 1
+
+  ).padStart(2, "0")}-${String(today.getDate()).padStart(
+
+    2,
+
+    "0"
+
+  )}`;
+
+}
+
+
+
+function formatDate(date: string) {
+
+  if (!date) return "";
+
+
+
+  const value = new Date(`${date}T00:00:00`);
+
+
+
+  return value.toLocaleDateString("en-IN", {
+
+    day: "numeric",
+
+    month: "short",
+
+  });
+
+}
+
+
+
+function getMonthData(monthOffset: number) {
+
+  const now = new Date();
+
+
+
+  const date = new Date(
+
+    now.getFullYear(),
+
+    now.getMonth() + monthOffset,
+
+    1
+
+  );
+
+
+
+  const year = date.getFullYear();
+
+  const month = date.getMonth();
+
+
+
+  const firstDay = new Date(year, month, 1).getDay();
+
+
+
+  const daysInMonth = new Date(
+
+    year,
+
+    month + 1,
+
+    0
+
+  ).getDate();
+
+
+
+  const days: (number | null)[] = [];
+
+
+
+  for (let i = 0; i < firstDay; i++) {
+
+    days.push(null);
+
+  }
+
+
+
+  for (let day = 1; day <= daysInMonth; day++) {
+
+    days.push(day);
+
+  }
+
+
+
+  return {
+
+    year,
+
+    month,
+
+    days,
+
+    label: date.toLocaleDateString("en-IN", {
+
+      month: "long",
+
+      year: "numeric",
+
+    }),
+
+  };
+
+}
+
+
+
+function dateToString(
+
+  year: number,
+
+  month: number,
+
+  day: number
+
+) {
+
+  return `${year}-${String(month + 1).padStart(
+
+    2,
+
+    "0"
+
+  )}-${String(day).padStart(2, "0")}`;
+
+}
+
+
 
 export default function Home() {
+
   const router = useRouter();
 
+
+
   const [listings, setListings] = useState<Listing[]>([]);
+
   const [loading, setLoading] = useState(true);
 
-  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+
 
   const [location, setLocation] = useState("");
+
   const [checkIn, setCheckIn] = useState("");
+
   const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState("");
+
+
+
+  const [guests, setGuests] = useState<GuestCounts>({
+
+    adults: 0,
+
+    children: 0,
+
+    infants: 0,
+
+    pets: 0,
+
+  });
+
+
+
+  const [activePanel, setActivePanel] =
+
+    useState<SearchPanel>(null);
+
+
+
+  const [calendarOffset, setCalendarOffset] =
+
+    useState(0);
+
+
+
+  const [showMenu, setShowMenu] = useState(false);
 
   const [showFilters, setShowFilters] = useState(false);
+
+
+
   const [minPrice, setMinPrice] = useState("");
+
   const [maxPrice, setMaxPrice] = useState("");
+
   const [propertyType, setPropertyType] = useState("");
 
-  function getToday() {
-    const today = new Date();
 
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
 
-    return `${year}-${month}-${day}`;
-  }
+  const [favorites, setFavorites] = useState<number[]>(
+
+    []
+
+  );
+
+
+
+  const [cardIndexes, setCardIndexes] = useState<
+
+    Record<number, number>
+
+  >({});
+
+
+
+  const [toast, setToast] = useState("");
+
+  const [isCompactHeader, setIsCompactHeader] = useState(false);
+
+  const searchRef = useRef<HTMLDivElement>(null);
+
+
 
   const today = getToday();
 
-  async function fetchListings() {
-    setLoading(true);
 
-    try {
-      const params = new URLSearchParams();
 
-      if (location.trim()) {
-        params.append("location", location.trim());
-      }
+  const totalGuests =
 
-      if (guests) {
-        params.append("guests", guests);
-      }
+    guests.adults + guests.children;
 
-      if (checkIn) {
-        params.append("check_in", checkIn);
-      }
 
-      if (checkOut) {
-        params.append("check_out", checkOut);
-      }
 
-      if (minPrice) {
-        params.append("min_price", minPrice);
-      }
+  const firstMonth = getMonthData(calendarOffset);
 
-      if (maxPrice) {
-        params.append("max_price", maxPrice);
-      }
+  const secondMonth = getMonthData(
 
-      if (propertyType) {
-        params.append("property_type", propertyType);
-      }
+    calendarOffset + 1
 
-      const response = await fetch(
-        `http://127.0.0.1:8000/listings/?${params.toString()}`
-      );
+  );
 
-      const data = await response.json();
 
-      setListings(data.items || []);
-    } catch (error) {
-      console.error("Failed to fetch listings:", error);
-      setListings([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function fetchFavorites() {
-    try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/favorites/?user_id=${USER_ID}`
-      );
-
-      if (!response.ok) {
-        return;
-      }
-
-      const data = await response.json();
-
-      setFavoriteIds(
-        data.map((listing: Listing) => listing.id)
-      );
-    } catch (error) {
-      console.error("Failed to fetch favorites:", error);
-    }
-  }
 
   useEffect(() => {
+
     fetchListings();
-    fetchFavorites();
+
+    loadFavorites();
+
+
+
+    function handleClickOutside(event: MouseEvent) {
+
+      if (
+
+        searchRef.current &&
+
+        !searchRef.current.contains(
+
+          event.target as Node
+
+        )
+
+      ) {
+
+        setActivePanel(null);
+
+      }
+
+    }
+
+
+
+    document.addEventListener(
+
+      "mousedown",
+
+      handleClickOutside
+
+    );
+
+
+
+    return () => {
+
+      document.removeEventListener(
+
+        "mousedown",
+
+        handleClickOutside
+
+      );
+
+    };
+
   }, []);
 
-  function handleCheckInChange(value: string) {
-    setCheckIn(value);
 
-    if (checkOut && value > checkOut) {
-      setCheckOut("");
+
+  useEffect(() => {
+
+    if (!toast) return;
+
+
+
+    const timer = setTimeout(() => {
+
+      setToast("");
+
+    }, 2500);
+
+
+
+    return () => clearTimeout(timer);
+
+  }, [toast]);
+
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const shouldCompact = window.scrollY > 120;
+
+      setIsCompactHeader((current) =>
+        current === shouldCompact ? current : shouldCompact
+      );
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+
+  async function fetchListings() {
+
+    setLoading(true);
+
+
+
+    try {
+
+      const params = new URLSearchParams();
+
+
+
+      params.set("limit", "50");
+
+
+
+      if (location.trim()) {
+
+        params.set(
+
+          "location",
+
+          location.trim()
+
+        );
+
+      }
+
+
+
+      if (totalGuests > 0) {
+
+        params.set(
+
+          "guests",
+
+          String(totalGuests)
+
+        );
+
+      }
+
+
+
+      if (checkIn) {
+
+        params.set("check_in", checkIn);
+
+      }
+
+
+
+      if (checkOut) {
+
+        params.set("check_out", checkOut);
+
+      }
+
+
+
+      if (minPrice) {
+
+        params.set("min_price", minPrice);
+
+      }
+
+
+
+      if (maxPrice) {
+
+        params.set("max_price", maxPrice);
+
+      }
+
+
+
+      if (propertyType) {
+
+        params.set(
+
+          "property_type",
+
+          propertyType
+
+        );
+
+      }
+
+
+
+      const response = await fetch(
+
+        `${API_URL}/listings/?${params.toString()}`
+
+      );
+
+
+
+      if (!response.ok) {
+
+        throw new Error(
+
+          "Failed to fetch listings"
+
+        );
+
+      }
+
+
+
+      const data = await response.json();
+
+
+
+      setListings(data.items || []);
+
+    } catch (error) {
+
+      console.error(error);
+
+      setListings([]);
+
+    } finally {
+
+      setLoading(false);
+
     }
+
   }
 
-  function handleSearch() {
-    if (checkIn && checkOut && checkOut <= checkIn) {
-      alert("Check-out must be after check-in.");
-      return;
+
+
+  async function loadFavorites() {
+
+    try {
+
+      const response = await fetch(
+
+        `${API_URL}/favorites/?user_id=${GUEST_ID}`
+
+      );
+
+
+
+      if (!response.ok) return;
+
+
+
+      const data = await response.json();
+
+
+
+      setFavorites(
+
+        data.map(
+
+          (item: Listing) => item.id
+
+        )
+
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
     }
 
-    if (
-      minPrice &&
-      maxPrice &&
-      Number(minPrice) > Number(maxPrice)
-    ) {
-      alert("Maximum price must be greater than minimum price.");
-      return;
-    }
-
-    fetchListings();
   }
 
-  function clearFilters() {
-    setMinPrice("");
-    setMaxPrice("");
-    setPropertyType("");
-  }
+
 
   async function toggleFavorite(
-    event: React.MouseEvent<HTMLButtonElement>,
+
+    event: React.MouseEvent,
+
     listingId: number
+
+  ) {
+
+    event.stopPropagation();
+
+
+
+    const isFavorite =
+
+      favorites.includes(listingId);
+
+
+
+    try {
+
+      const response = await fetch(
+
+        `${API_URL}/favorites/${listingId}?user_id=${GUEST_ID}`,
+
+        {
+
+          method: isFavorite
+
+            ? "DELETE"
+
+            : "POST",
+
+        }
+
+      );
+
+
+
+      if (!response.ok) {
+
+        throw new Error(
+
+          "Favorite request failed"
+
+        );
+
+      }
+
+
+
+      setFavorites((current) =>
+
+        isFavorite
+
+          ? current.filter(
+
+              (id) => id !== listingId
+
+            )
+
+          : [...current, listingId]
+
+      );
+
+
+
+      setToast(
+
+        isFavorite
+
+          ? "Removed from your wishlist"
+
+          : "Added to your wishlist"
+
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+  }
+
+
+
+  function togglePanel(panel: SearchPanel) {
+
+    setActivePanel((current) =>
+
+      current === panel ? null : panel
+
+    );
+
+
+
+    setShowMenu(false);
+
+  }
+
+
+
+  function updateGuest(
+
+    type: keyof GuestCounts,
+
+    amount: number
+
+  ) {
+
+    setGuests((current) => {
+
+      const next = Math.max(
+
+        0,
+
+        current[type] + amount
+
+      );
+
+
+
+      return {
+
+        ...current,
+
+        [type]: next,
+
+      };
+
+    });
+
+  }
+
+
+
+  function selectDestination(
+
+    value: string
+
+  ) {
+
+    setLocation(value);
+
+    setActivePanel("when");
+
+  }
+
+
+
+  function handleDateClick(
+
+    year: number,
+
+    month: number,
+
+    day: number
+
+  ) {
+
+    const selected = dateToString(
+
+      year,
+
+      month,
+
+      day
+
+    );
+
+
+
+    if (selected < today) return;
+
+
+
+    if (
+
+      !checkIn ||
+
+      (checkIn && checkOut)
+
+    ) {
+
+      setCheckIn(selected);
+
+      setCheckOut("");
+
+      return;
+
+    }
+
+
+
+    if (selected <= checkIn) {
+
+      setCheckIn(selected);
+
+      setCheckOut("");
+
+      return;
+
+    }
+
+
+
+    setCheckOut(selected);
+
+    setActivePanel("who");
+
+  }
+
+
+
+  function handleSearch() {
+
+    if (
+
+      checkIn &&
+
+      checkOut &&
+
+      checkOut <= checkIn
+
+    ) {
+
+      setToast(
+
+        "Check-out must be after check-in."
+
+      );
+
+      return;
+
+    }
+
+
+
+    if (
+
+      minPrice &&
+
+      maxPrice &&
+
+      Number(minPrice) >
+
+        Number(maxPrice)
+
+    ) {
+
+      setToast(
+
+        "Maximum price must be greater than minimum price."
+
+      );
+
+      return;
+
+    }
+
+
+
+    setActivePanel(null);
+
+    fetchListings();
+
+  }
+
+
+
+  function clearFilters() {
+
+    setMinPrice("");
+
+    setMaxPrice("");
+
+    setPropertyType("");
+
+
+
+    setTimeout(() => {
+
+      fetchListings();
+
+    }, 0);
+
+  }
+
+
+
+  function clearDates() {
+
+    setCheckIn("");
+
+    setCheckOut("");
+
+  }
+
+
+
+  function nextCalendar() {
+
+    setCalendarOffset(
+
+      (current) => current + 1
+
+    );
+
+  }
+
+
+
+  function previousCalendar() {
+
+    setCalendarOffset((current) =>
+
+      Math.max(0, current - 1)
+
+    );
+
+  }
+
+
+
+  function changeCardImage(
+    event: React.MouseEvent,
+    listingId: number,
+    direction: number,
+    imageCount: number
   ) {
     event.stopPropagation();
 
-    const isFavorite = favoriteIds.includes(listingId);
+    if (imageCount <= 1) return;
 
-    try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/favorites/${listingId}?user_id=${USER_ID}`,
-        {
-          method: isFavorite ? "DELETE" : "POST",
-        }
-      );
+    setCardIndexes((current) => {
+      const currentIndex = current[listingId] || 0;
+      const nextIndex =
+        (currentIndex + direction + imageCount) % imageCount;
 
-      if (!response.ok) {
-        throw new Error("Failed to update favorite");
-      }
-
-      if (isFavorite) {
-        setFavoriteIds((current) =>
-          current.filter((id) => id !== listingId)
-        );
-      } else {
-        setFavoriteIds((current) => [
-          ...current,
-          listingId,
-        ]);
-      }
-    } catch (error) {
-      console.error("Failed to update favorite:", error);
-      alert("Could not update wishlist. Please try again.");
-    }
+      return {
+        ...current,
+        [listingId]: nextIndex,
+      };
+    });
   }
 
+  function openListing(
+
+    listingId: number
+
+  ) {
+
+    window.open(
+
+      `/listings/${listingId}`,
+
+      "_blank"
+
+    );
+
+  }
+
+
+
+  const groupedListings = useMemo(() => {
+
+    if (listings.length === 0) {
+
+      return [];
+
+    }
+
+
+
+    return sections.map(
+
+      (title, sectionIndex) => ({
+
+        title,
+
+        listings: listings.map(
+
+          (listing, index) => ({
+
+            ...listing,
+
+            displayIndex:
+
+              index + sectionIndex,
+
+          })
+
+        ),
+
+      })
+
+    );
+
+  }, [listings]);
+
+
+
+  function renderCalendar(
+
+    calendar: ReturnType<
+
+      typeof getMonthData
+
+    >
+
+  ) {
+
+    return (
+
+      <div className="min-w-[290px] flex-1">
+
+        <div className="mb-5 text-center text-sm font-semibold">
+
+          {calendar.label}
+
+        </div>
+
+
+
+        <div className="mb-2 grid grid-cols-7 text-center text-xs font-medium text-gray-500">
+
+          {[
+
+            "S",
+
+            "M",
+
+            "T",
+
+            "W",
+
+            "T",
+
+            "F",
+
+            "S",
+
+          ].map((day, index) => (
+
+            <span
+
+              key={`${day}-${index}`}
+
+            >
+
+              {day}
+
+            </span>
+
+          ))}
+
+        </div>
+
+
+
+        <div className="grid grid-cols-7 gap-y-2">
+
+          {calendar.days.map(
+
+            (day, index) => {
+
+              if (!day) {
+
+                return (
+
+                  <div
+
+                    key={`empty-${index}`}
+
+                    className="h-10"
+
+                  />
+
+                );
+
+              }
+
+
+
+              const dateValue =
+
+                dateToString(
+
+                  calendar.year,
+
+                  calendar.month,
+
+                  day
+
+                );
+
+
+
+              const disabled =
+
+                dateValue < today;
+
+
+
+              const selected =
+
+                dateValue === checkIn ||
+
+                dateValue === checkOut;
+
+
+
+              const inRange =
+
+                checkIn &&
+
+                checkOut &&
+
+                dateValue > checkIn &&
+
+                dateValue < checkOut;
+
+
+
+              return (
+
+                <button
+
+                  key={dateValue}
+
+                  disabled={disabled}
+
+                  onClick={() =>
+
+                    handleDateClick(
+
+                      calendar.year,
+
+                      calendar.month,
+
+                      day
+
+                    )
+
+                  }
+
+                  className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm transition ${
+
+                    disabled
+
+                      ? "cursor-not-allowed text-gray-300"
+
+                      : "cursor-pointer hover:bg-gray-100"
+
+                  } ${
+
+                    selected
+
+                      ? "bg-gray-900 text-white hover:bg-gray-900"
+
+                      : ""
+
+                  } ${
+
+                    inRange
+
+                      ? "rounded-none bg-gray-100 text-gray-900"
+
+                      : ""
+
+                  }`}
+
+                >
+
+                  {day}
+
+                </button>
+
+              );
+
+            }
+
+          )}
+
+        </div>
+
+      </div>
+
+    );
+
+  }
+
+
+
   return (
+
     <main className="min-h-screen bg-white text-gray-900">
 
-      {/* Navbar */}
-      <nav className="flex items-center justify-between border-b px-8 py-5">
+      {/* =====================================================
 
-        {/* Airbnb Logo */}
+          HEADER
+
+      ===================================================== */}
+
+
+
+      <header className="sticky top-0 z-40 border-b bg-white">
+
+        <div className="mx-auto max-w-[1440px] px-6">
+
+          <div className="relative flex items-center justify-between py-5">
+
+            {/* LOGO */}
+
+
+
+            <button
+
+              onClick={() =>
+
+                router.push("/")
+
+              }
+
+              className="cursor-pointer text-2xl font-bold tracking-tight text-[#ff385c]"
+
+            >
+
+              airbnb
+
+            </button>
+
+
+
+            {/* CATEGORIES */}
+
+
+
+            <div
+              className={`hidden items-center gap-8 md:flex transition-all duration-300 ease-out ${
+                isCompactHeader
+                  ? "pointer-events-none scale-95 opacity-0"
+                  : "scale-100 opacity-100"
+              }`}
+            >
+
+              <button className="flex cursor-pointer flex-col items-center gap-1 border-b-2 border-gray-900 pb-2 text-sm font-semibold">
+
+                <span className="text-xl">
+
+                  🌐
+
+                </span>
+
+                All
+
+              </button>
+
+
+
+              <button className="flex cursor-pointer flex-col items-center gap-1 text-sm text-gray-500 hover:text-gray-900">
+
+                <span className="text-xl">
+
+                  🏠
+
+                </span>
+
+                Homes
+
+              </button>
+
+
+
+              <button
+
+                onClick={() =>
+
+                  setToast(
+
+                    "Experiences are coming soon"
+
+                  )
+
+                }
+
+                className="flex cursor-pointer flex-col items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+
+              >
+
+                <span className="text-xl">
+
+                  🎈
+
+                </span>
+
+                Experiences
+
+              </button>
+
+
+
+              <button
+
+                onClick={() =>
+
+                  setToast(
+
+                    "Services are coming soon"
+
+                  )
+
+                }
+
+                className="flex cursor-pointer flex-col items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+
+              >
+
+                <span className="text-xl">
+
+                  🍽️
+
+                </span>
+
+                Services
+
+              </button>
+
+            </div>
+
+
+
+            {/* COMPACT SEARCH - shown after scrolling */}
+
+            <button
+              onClick={() =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: "smooth",
+                })
+              }
+              className={`absolute left-1/2 hidden w-[430px] -translate-x-1/2 cursor-pointer items-center rounded-full border bg-white px-2 py-2 shadow-sm transition-[opacity,transform] duration-200 ease-out md:flex ${
+                isCompactHeader
+                  ? "pointer-events-auto scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0"
+              }`}
+            >
+              <span className="flex min-w-0 flex-1 items-center gap-3 px-4 text-left">
+                <span className="truncate text-sm font-semibold">
+                  {location || "Anywhere"}
+                </span>
+                <span className="h-4 w-px bg-gray-200" />
+                <span className="shrink-0 text-sm text-gray-500">
+                  {checkIn && checkOut
+                    ? `${formatDate(checkIn)} – ${formatDate(checkOut)}`
+                    : "Any week"}
+                </span>
+                <span className="h-4 w-px bg-gray-200" />
+                <span className="shrink-0 text-sm text-gray-500">
+                  {totalGuests > 0 ? `${totalGuests} guests` : "Add guests"}
+                </span>
+              </span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff385c] text-sm text-white">
+                🔍
+              </span>
+            </button>
+
+            {/* RIGHT NAV */}
+
+
+
+            <div className="flex items-center gap-3">
+
+              <button
+
+                onClick={() =>
+
+                  router.push("/host")
+
+                }
+
+                className="hidden cursor-pointer rounded-full px-4 py-3 text-sm font-medium hover:bg-gray-100 md:block"
+
+              >
+
+                Airbnb your home
+
+              </button>
+
+
+
+              <button
+
+                onClick={() =>
+
+                  setShowMenu(
+
+                    (current) => !current
+
+                  )
+
+                }
+
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 shadow-sm hover:shadow-md"
+
+              >
+
+                <span className="text-lg">
+
+                  ☰
+
+                </span>
+
+
+
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
+
+                  S
+
+                </span>
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+
+          {/* =================================================
+
+              SEARCH BAR
+
+          ================================================= */}
+
+
+
+          <div
+
+            ref={searchRef}
+
+            className={`relative mx-auto max-w-4xl overflow-hidden transition-[opacity,transform,max-height,margin] duration-200 ease-out ${
+              isCompactHeader
+                ? "pointer-events-none mb-0 max-h-0 -translate-y-1 opacity-0"
+                : "mb-5 max-h-28 translate-y-0 opacity-100"
+            }`}
+
+          >
+
+            <div className="flex items-center rounded-full border bg-white shadow-md transition-shadow duration-200 hover:shadow-lg">
+
+              {/* WHERE */}
+
+
+
+              <button
+
+                onClick={() =>
+
+                  togglePanel("where")
+
+                }
+
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
+
+                  activePanel === "where"
+
+                    ? "bg-white shadow-lg"
+
+                    : "hover:bg-gray-100"
+
+                }`}
+
+              >
+
+                <span className="text-xs font-semibold">
+
+                  Where
+
+                </span>
+
+
+
+                <span className="mt-1 truncate text-sm text-gray-500">
+
+                  {location ||
+
+                    "Search destinations"}
+
+                </span>
+
+              </button>
+
+
+
+              <div className="h-8 w-px bg-gray-200" />
+
+
+
+              {/* WHEN */}
+
+
+
+              <button
+
+                onClick={() =>
+
+                  togglePanel("when")
+
+                }
+
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
+
+                  activePanel === "when"
+
+                    ? "bg-white shadow-lg"
+
+                    : "hover:bg-gray-100"
+
+                }`}
+
+              >
+
+                <span className="text-xs font-semibold">
+
+                  When
+
+                </span>
+
+
+
+                <span className="mt-1 text-sm text-gray-500">
+
+                  {checkIn
+
+                    ? checkOut
+
+                      ? `${formatDate(
+
+                          checkIn
+
+                        )} – ${formatDate(
+
+                          checkOut
+
+                        )}`
+
+                      : formatDate(checkIn)
+
+                    : "Add dates"}
+
+                </span>
+
+              </button>
+
+
+
+              <div className="h-8 w-px bg-gray-200" />
+
+
+
+              {/* WHO */}
+
+
+
+              <button
+
+                onClick={() =>
+
+                  togglePanel("who")
+
+                }
+
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-full px-7 py-4 text-left ${
+
+                  activePanel === "who"
+
+                    ? "bg-white shadow-lg"
+
+                    : "hover:bg-gray-100"
+
+                }`}
+
+              >
+
+                <span className="text-xs font-semibold">
+
+                  Who
+
+                </span>
+
+
+
+                <span className="mt-1 text-sm text-gray-500">
+
+                  {totalGuests > 0
+
+                    ? `${totalGuests} guests`
+
+                    : "Add guests"}
+
+                </span>
+
+              </button>
+
+
+
+              {/* SEARCH BUTTON */}
+
+
+
+              <button
+
+                onClick={handleSearch}
+
+                className="mr-2 flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#ff385c] text-xl text-white transition duration-200 hover:scale-105"
+
+                aria-label="Search"
+
+              >
+
+                🔍
+
+              </button>
+
+            </div>
+
+
+
+            {/* =============================================
+
+                WHERE PANEL
+
+            ============================================= */}
+
+
+
+            {activePanel === "where" && (
+
+              <div className="absolute left-0 top-[72px] z-50 w-[420px] rounded-3xl bg-white p-7 shadow-xl">
+
+                <h3 className="text-sm font-semibold">
+
+                  Search destinations
+
+                </h3>
+
+
+
+                <div className="mt-5 space-y-2">
+
+                  {destinations.map(
+
+                    (destination) => (
+
+                      <button
+
+                        key={destination}
+
+                        onClick={() =>
+
+                          selectDestination(
+
+                            destination
+
+                          )
+
+                        }
+
+                        className="flex w-full cursor-pointer items-center gap-4 rounded-xl p-3 text-left hover:bg-gray-100"
+
+                      >
+
+                        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-xl">
+
+                          📍
+
+                        </span>
+
+
+
+                        <span>
+
+                          <span className="block text-sm font-semibold">
+
+                            {destination}
+
+                          </span>
+
+
+
+                          <span className="text-xs text-gray-500">
+
+                            Search stays in{" "}
+
+                            {destination}
+
+                          </span>
+
+                        </span>
+
+                      </button>
+
+                    )
+
+                  )}
+
+                </div>
+
+              </div>
+
+            )}
+
+
+
+            {/* =============================================
+
+                WHEN PANEL
+
+            ============================================= */}
+
+
+
+            {activePanel === "when" && (
+
+              <div className="absolute left-1/2 top-[72px] z-50 w-[760px] -translate-x-1/2 rounded-3xl bg-white p-7 shadow-xl">
+
+                <div className="mb-6 flex justify-center">
+
+                  <div className="flex rounded-full bg-gray-100 p-1">
+
+                    <button className="cursor-pointer rounded-full bg-white px-8 py-2 text-sm font-semibold shadow-sm">
+
+                      Dates
+
+                    </button>
+
+
+
+                    <button
+
+                      onClick={() =>
+
+                        setToast(
+
+                          "Flexible dates are coming soon"
+
+                        )
+
+                      }
+
+                      className="cursor-pointer rounded-full px-8 py-2 text-sm text-gray-600"
+
+                    >
+
+                      Flexible
+
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+
+                <div className="flex items-center gap-6">
+
+                  <button
+
+                    onClick={
+
+                      previousCalendar
+
+                    }
+
+                    disabled={
+
+                      calendarOffset === 0
+
+                    }
+
+                    className="cursor-pointer text-2xl disabled:cursor-not-allowed disabled:text-gray-300"
+
+                  >
+
+                    ‹
+
+                  </button>
+
+
+
+                  {renderCalendar(
+
+                    firstMonth
+
+                  )}
+
+
+
+                  {renderCalendar(
+
+                    secondMonth
+
+                  )}
+
+
+
+                  <button
+
+                    onClick={nextCalendar}
+
+                    className="cursor-pointer text-2xl"
+
+                  >
+
+                    ›
+
+                  </button>
+
+                </div>
+
+
+
+                {(checkIn || checkOut) && (
+
+                  <div className="mt-6 flex items-center justify-between border-t pt-5">
+
+                    <div className="text-sm">
+
+                      {checkIn &&
+
+                        `Check-in: ${formatDate(
+
+                          checkIn
+
+                        )}`}
+
+
+
+                      {checkOut &&
+
+                        ` · Check-out: ${formatDate(
+
+                          checkOut
+
+                        )}`}
+
+                    </div>
+
+
+
+                    <button
+
+                      onClick={clearDates}
+
+                      className="cursor-pointer text-sm font-semibold underline"
+
+                    >
+
+                      Clear dates
+
+                    </button>
+
+                  </div>
+
+                )}
+
+              </div>
+
+            )}
+
+
+
+            {/* =============================================
+
+                WHO PANEL
+
+            ============================================= */}
+
+
+
+            {activePanel === "who" && (
+
+              <div className="absolute right-0 top-[72px] z-50 w-[390px] rounded-3xl bg-white p-7 shadow-xl">
+
+                {[
+
+                  {
+
+                    key: "adults" as const,
+
+                    title: "Adults",
+
+                    subtitle:
+
+                      "Ages 13 or above",
+
+                  },
+
+                  {
+
+                    key: "children" as const,
+
+                    title: "Children",
+
+                    subtitle:
+
+                      "Ages 2–12",
+
+                  },
+
+                  {
+
+                    key: "infants" as const,
+
+                    title: "Infants",
+
+                    subtitle:
+
+                      "Under 2",
+
+                  },
+
+                  {
+
+                    key: "pets" as const,
+
+                    title: "Pets",
+
+                    subtitle:
+
+                      "Bringing a service animal?",
+
+                  },
+
+                ].map((item, index) => (
+
+                  <div
+
+                    key={item.key}
+
+                    className={`flex items-center justify-between py-5 ${
+
+                      index !== 3
+
+                        ? "border-b"
+
+                        : ""
+
+                    }`}
+
+                  >
+
+                    <div>
+
+                      <div className="font-semibold">
+
+                        {item.title}
+
+                      </div>
+
+
+
+                      <div className="mt-1 text-sm text-gray-500">
+
+                        {item.subtitle}
+
+                      </div>
+
+                    </div>
+
+
+
+                    <div className="flex items-center gap-4">
+
+                      <button
+
+                        onClick={() =>
+
+                          updateGuest(
+
+                            item.key,
+
+                            -1
+
+                          )
+
+                        }
+
+                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-lg text-gray-500 hover:border-gray-900"
+
+                      >
+
+                        −
+
+                      </button>
+
+
+
+                      <span className="w-4 text-center">
+
+                        {guests[item.key]}
+
+                      </span>
+
+
+
+                      <button
+
+                        onClick={() =>
+
+                          updateGuest(
+
+                            item.key,
+
+                            1
+
+                          )
+
+                        }
+
+                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-lg text-gray-500 hover:border-gray-900"
+
+                      >
+
+                        +
+
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            )}
+
+          </div>
+
+
+
+          {/* =================================================
+
+              MENU
+
+          ================================================= */}
+
+
+
+          {showMenu && (
+
+            <div className="absolute right-0 top-14 w-80 max-h-[calc(100vh-180px)] overflow-y-auto rounded-2xl border bg-white shadow-xl">
+
+              {[
+
+                ["♡", "Wishlists"],
+
+                ["♧", "Trips"],
+
+                ["▢", "Messages"],
+
+                ["◎", "Profile"],
+
+              ].map(([icon, label]) => (
+
+                <button
+
+                  key={label}
+
+                  onClick={() => {
+
+                    if (
+
+                      label === "Trips"
+
+                    ) {
+
+                      router.push(
+
+                        "/trips"
+
+                      );
+
+                    } else {
+
+                      setToast(
+
+                        `${label} is coming soon`
+
+                      );
+
+                    }
+
+
+
+                    setShowMenu(false);
+
+                  }}
+
+                  className="flex w-full cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
+
+                >
+
+                  <span className="text-xl">
+
+                    {icon}
+
+                  </span>
+
+
+
+                  {label}
+
+                </button>
+
+              ))}
+
+
+
+              <div className="my-2 border-t" />
+
+
+
+              {[
+
+                ["🔔", "Notifications"],
+
+                [
+
+                  "⚙️",
+
+                  "Account settings",
+
+                ],
+
+                [
+
+                  "🌐",
+
+                  "Language & currency",
+
+                ],
+
+                ["?", "Help Centre"],
+
+              ].map(([icon, label]) => (
+
+                <button
+
+                  key={label}
+
+                  onClick={() => {
+
+                    setToast(
+
+                      `${label} is coming soon`
+
+                    );
+
+
+
+                    setShowMenu(false);
+
+                  }}
+
+                  className="flex w-full cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
+
+                >
+
+                  <span className="text-lg">
+
+                    {icon}
+
+                  </span>
+
+
+
+                  {label}
+
+                </button>
+
+              ))}
+
+
+
+              <div className="my-2 border-t" />
+
+
+
+              <button
+
+                onClick={() => {
+
+                  router.push("/host");
+
+                  setShowMenu(false);
+
+                }}
+
+                className="w-full cursor-pointer rounded-xl px-4 py-3 text-left text-sm font-semibold hover:bg-gray-100"
+
+              >
+
+                Become a host
+
+              </button>
+
+
+
+              <button
+
+                onClick={() => {
+
+                  setToast("Coming soon");
+
+                  setShowMenu(false);
+
+                }}
+
+                className="w-full cursor-pointer rounded-xl px-4 py-3 text-left text-sm hover:bg-gray-100"
+
+              >
+
+                Refer a host
+
+              </button>
+
+
+
+              <button
+
+                onClick={() => {
+
+                  setToast("Logged out");
+
+                  setShowMenu(false);
+
+                }}
+
+                className="mt-2 w-full cursor-pointer border-t px-4 py-4 text-left text-sm"
+
+              >
+
+                Log out
+
+              </button>
+
+            </div>
+
+          )}
+
+        </div>
+
+      </header>
+
+
+
+      {/* =====================================================
+
+          CATEGORY ROW
+
+      ===================================================== */}
+
+
+
+      <div className="border-b bg-white">
+
+        <div className="mx-auto flex max-w-[1440px] gap-8 overflow-x-auto px-6 py-4">
+
+          {categories.map(
+
+            (category, index) => (
+
+              <button
+
+                key={category.label}
+
+                onClick={() => {
+
+                  if (
+
+                    category.label ===
+
+                    "Homes"
+
+                  ) {
+
+                    setPropertyType("");
+
+                    fetchListings();
+
+                  } else {
+
+                    setToast(
+
+                      `${category.label} category selected`
+
+                    );
+
+                  }
+
+                }}
+
+                className={`flex min-w-fit cursor-pointer flex-col items-center gap-1 border-b-2 pb-2 text-xs transition ${
+
+                  index === 0
+
+                    ? "border-gray-900 font-semibold"
+
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-900"
+
+                }`}
+
+              >
+
+                <span className="text-xl">
+
+                  {category.icon}
+
+                </span>
+
+
+
+                {category.label}
+
+              </button>
+
+            )
+
+          )}
+
+        </div>
+
+      </div>
+
+
+
+      {/* =====================================================
+
+          FILTER BAR
+
+      ===================================================== */}
+
+
+
+      <section className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-5">
+
+        <div>
+
+          <span className="text-sm text-gray-500">
+
+            {listings.length} stays
+
+          </span>
+
+        </div>
+
+
+
         <button
-          onClick={() => router.push("/")}
-          className="cursor-pointer text-2xl font-bold text-red-500 transition hover:opacity-80"
+
+          onClick={() =>
+
+            setShowFilters(
+
+              (current) => !current
+
+            )
+
+          }
+
+          className="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-3 text-sm font-semibold hover:shadow-sm"
+
         >
-          airbnb
+
+          ⚙ Filters
+
         </button>
 
-        <div className="flex items-center gap-6 text-sm">
+      </section>
 
-          <button
-            onClick={() => router.push("/trips")}
-            className="cursor-pointer font-medium hover:underline"
-          >
-            Trips
-          </button>
 
-          <button
-            onClick={() => router.push("/host")}
-            className="cursor-pointer hover:underline"
-          >
-            Airbnb your home
-          </button>
 
-          <button
-            className="cursor-pointer"
-            aria-label="Language"
-          >
-            🌐
-          </button>
+      {showFilters && (
 
-          <button
-            className="cursor-pointer"
-            aria-label="Menu"
-          >
-            ☰
-          </button>
+        <section className="mx-auto max-w-[1440px] px-6 pb-6">
 
-        </div>
-      </nav>
-
-      {/* Search */}
-      <section className="border-b px-8 py-6">
-
-        <div className="mx-auto flex max-w-4xl items-center rounded-full border bg-white px-6 py-3 shadow-md">
-
-          {/* Location */}
-          <div className="flex-1 border-r px-4">
-
-            <label className="text-xs font-semibold">
-              Where
-            </label>
-
-            <input
-              type="text"
-              value={location}
-              onChange={(event) =>
-                setLocation(event.target.value)
-              }
-              placeholder="Search destinations"
-              className="mt-1 w-full bg-transparent text-sm outline-none"
-            />
-
-          </div>
-
-          {/* Check-in */}
-          <div className="flex-1 border-r px-4">
-
-            <label className="text-xs font-semibold">
-              Check in
-            </label>
-
-            <input
-              type="date"
-              min={today}
-              value={checkIn}
-              onChange={(event) =>
-                handleCheckInChange(event.target.value)
-              }
-              className="mt-1 w-full cursor-pointer bg-transparent text-sm outline-none"
-            />
-
-          </div>
-
-          {/* Check-out */}
-          <div className="flex-1 border-r px-4">
-
-            <label className="text-xs font-semibold">
-              Check out
-            </label>
-
-            <input
-              type="date"
-              min={checkIn || today}
-              value={checkOut}
-              disabled={!checkIn}
-              onChange={(event) =>
-                setCheckOut(event.target.value)
-              }
-              className="mt-1 w-full cursor-pointer bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:text-gray-400"
-            />
-
-          </div>
-
-          {/* Guests */}
-          <div className="flex-1 px-4">
-
-            <label className="text-xs font-semibold">
-              Who
-            </label>
-
-            <select
-              value={guests}
-              onChange={(event) =>
-                setGuests(event.target.value)
-              }
-              className="mt-1 w-full cursor-pointer bg-transparent text-sm outline-none"
-            >
-              <option value="">
-                Add guests
-              </option>
-
-              {[1, 2, 3, 4, 5, 6].map((number) => (
-                <option
-                  key={number}
-                  value={number}
-                >
-                  {number}{" "}
-                  {number === 1 ? "guest" : "guests"}
-                </option>
-              ))}
-            </select>
-
-          </div>
-
-          {/* Search */}
-          <button
-            onClick={handleSearch}
-            className="cursor-pointer rounded-full bg-red-500 px-5 py-3 text-white transition hover:bg-red-600"
-          >
-            🔍
-          </button>
-
-        </div>
-
-        {/* Filter button */}
-        <div className="mx-auto mt-4 flex max-w-6xl justify-end">
-
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="cursor-pointer rounded-full border px-5 py-2 text-sm font-semibold hover:bg-gray-50"
-          >
-            ⚙ Filters
-          </button>
-
-        </div>
-
-        {/* Filter panel */}
-        {showFilters && (
-          <div className="mx-auto mt-4 max-w-6xl rounded-2xl border bg-white p-6 shadow-md">
+          <div className="rounded-3xl border p-6 shadow-sm">
 
             <div className="grid gap-6 md:grid-cols-3">
 
-              {/* Minimum price */}
               <div>
 
                 <label className="text-sm font-semibold">
+
                   Minimum price
+
                 </label>
 
-                <div className="mt-2 flex items-center rounded-lg border px-3">
 
-                  <span className="text-gray-500">
-                    ₹
-                  </span>
+
+                <div className="mt-2 flex rounded-xl border px-4 py-3">
+
+                  <span>₹</span>
+
+
 
                   <input
+
                     type="number"
+
                     min="0"
+
                     value={minPrice}
+
                     onChange={(event) =>
-                      setMinPrice(event.target.value)
+
+                      setMinPrice(
+
+                        event.target.value
+
+                      )
+
                     }
+
                     placeholder="Any"
-                    className="w-full p-2 outline-none"
+
+                    className="ml-2 w-full outline-none"
+
                   />
 
                 </div>
 
               </div>
 
-              {/* Maximum price */}
+
+
               <div>
 
                 <label className="text-sm font-semibold">
+
                   Maximum price
+
                 </label>
 
-                <div className="mt-2 flex items-center rounded-lg border px-3">
 
-                  <span className="text-gray-500">
-                    ₹
-                  </span>
+
+                <div className="mt-2 flex rounded-xl border px-4 py-3">
+
+                  <span>₹</span>
+
+
 
                   <input
+
                     type="number"
+
                     min="0"
+
                     value={maxPrice}
+
                     onChange={(event) =>
-                      setMaxPrice(event.target.value)
+
+                      setMaxPrice(
+
+                        event.target.value
+
+                      )
+
                     }
+
                     placeholder="Any"
-                    className="w-full p-2 outline-none"
+
+                    className="ml-2 w-full outline-none"
+
                   />
 
                 </div>
 
               </div>
 
-              {/* Property type */}
+
+
               <div>
 
                 <label className="text-sm font-semibold">
+
                   Property type
+
                 </label>
+
+
 
                 <select
+
                   value={propertyType}
+
                   onChange={(event) =>
-                    setPropertyType(event.target.value)
+
+                    setPropertyType(
+
+                      event.target.value
+
+                    )
+
                   }
-                  className="mt-2 w-full cursor-pointer rounded-lg border bg-white p-2 outline-none"
+
+                  className="mt-2 w-full cursor-pointer rounded-xl border bg-white px-4 py-3 outline-none"
+
                 >
+
                   <option value="">
+
                     Any type
+
                   </option>
+
+
 
                   <option value="Apartment">
+
                     Apartment
+
                   </option>
+
+
 
                   <option value="Villa">
+
                     Villa
+
                   </option>
 
+
+
                   <option value="House">
+
                     House
+
                   </option>
+
                 </select>
 
               </div>
 
             </div>
 
-            {/* Filter actions */}
+
+
             <div className="mt-6 flex justify-end gap-3">
 
               <button
+
                 onClick={clearFilters}
-                className="cursor-pointer rounded-lg border px-5 py-2 text-sm font-semibold hover:bg-gray-50"
+
+                className="cursor-pointer rounded-full border px-6 py-3 text-sm font-semibold"
+
               >
-                Clear
+
+                Clear all
+
               </button>
 
+
+
               <button
+
                 onClick={() => {
+
                   handleSearch();
+
                   setShowFilters(false);
+
                 }}
-                className="cursor-pointer rounded-lg bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600"
+
+                className="cursor-pointer rounded-full bg-gray-900 px-6 py-3 text-sm font-semibold text-white"
+
               >
-                Apply filters
+
+                Show stays
+
               </button>
 
             </div>
 
           </div>
-        )}
 
-      </section>
+        </section>
 
-      {/* Categories */}
-      <section className="border-b px-8 py-5">
+      )}
 
-        <div className="mx-auto flex max-w-6xl gap-8 overflow-x-auto text-sm">
 
-          <div className="cursor-pointer whitespace-nowrap">
-            🏠 <span className="ml-2">Homes</span>
-          </div>
 
-          <div className="cursor-pointer whitespace-nowrap">
-            🏖️ <span className="ml-2">Beach</span>
-          </div>
+      {/* =====================================================
 
-          <div className="cursor-pointer whitespace-nowrap">
-            🏊 <span className="ml-2">Amazing pools</span>
-          </div>
+          LISTINGS
 
-          <div className="cursor-pointer whitespace-nowrap">
-            🌆 <span className="ml-2">Amazing views</span>
-          </div>
+      ===================================================== */}
 
-          <div className="cursor-pointer whitespace-nowrap">
-            🏡 <span className="ml-2">Countryside</span>
-          </div>
 
-        </div>
 
-      </section>
-
-      {/* Listings */}
-      <section className="mx-auto max-w-6xl px-8 py-8">
-
-        <h2 className="mb-6 text-2xl font-semibold">
-          Explore stays
-        </h2>
+      <section className="mx-auto max-w-[1440px] px-6 pb-20">
 
         {loading ? (
 
-          <p className="text-gray-500">
-            Loading listings...
-          </p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+
+            {Array.from({ length: 12 }).map(
+
+              (_, index) => (
+
+                <div key={index}>
+
+                  <div className="h-64 animate-pulse rounded-2xl bg-gray-200" />
+
+
+
+                  <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+
+
+
+                  <div className="mt-2 h-4 w-1/2 animate-pulse rounded bg-gray-200" />
+
+                </div>
+
+              )
+
+            )}
+
+          </div>
 
         ) : listings.length === 0 ? (
 
-          <div className="rounded-xl border p-10 text-center">
+          <div className="mx-auto max-w-xl py-24 text-center">
 
-            <h3 className="text-lg font-semibold">
+            <div className="text-6xl">
+
+              🏡
+
+            </div>
+
+
+
+            <h2 className="mt-6 text-2xl font-semibold">
+
               No stays found
-            </h3>
 
-            <p className="mt-2 text-sm text-gray-500">
-              Try different search or filter options.
+            </h2>
+
+
+
+            <p className="mt-3 text-gray-500">
+
+              Try changing your destination,
+
+              dates, guests, or filters.
+
             </p>
+
+
+
+            <button
+
+              onClick={() => {
+
+                setLocation("");
+
+                clearDates();
+
+
+
+                setGuests({
+
+                  adults: 0,
+
+                  children: 0,
+
+                  infants: 0,
+
+                  pets: 0,
+
+                });
+
+
+
+                clearFilters();
+
+              }}
+
+              className="mt-6 cursor-pointer rounded-full bg-gray-900 px-6 py-3 text-sm font-semibold text-white"
+
+            >
+
+              Clear search
+
+            </button>
 
           </div>
 
         ) : (
 
-          <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+          groupedListings.map(
 
-            {listings.map((listing) => {
+            (
 
-              const isFavorite =
-                favoriteIds.includes(listing.id);
+              section,
 
-              return (
-                <div
-                  key={listing.id}
-                  onClick={() =>
-                    window.open(
-                      `/listings/${listing.id}`,
-                      "_blank"
-                    )
-                  }
-                  className="cursor-pointer"
-                >
+              sectionIndex
 
-                  <div className="relative overflow-hidden rounded-xl">
+            ) => (
 
-                    <img
-                      src={
-                        listing.image_url ||
-                        "/placeholder.jpg"
-                      }
-                      alt={listing.title}
-                      className="h-64 w-full object-cover transition duration-300 hover:scale-105"
-                    />
+              <div
 
-                    <button
-                      onClick={(event) =>
-                        toggleFavorite(event, listing.id)
-                      }
-                      className="absolute right-3 top-3 cursor-pointer text-3xl text-white drop-shadow transition hover:scale-110"
-                      aria-label={
-                        isFavorite
-                          ? "Remove from wishlist"
-                          : "Add to wishlist"
-                      }
-                    >
-                      {isFavorite ? "♥" : "♡"}
+                key={section.title}
+
+                className="mb-12"
+
+              >
+
+                <div className="mb-5 flex items-center justify-between">
+
+                  <h2 className="text-xl font-semibold">
+
+                    {section.title}
+
+
+
+                    {sectionIndex === 0 &&
+
+                      location &&
+
+                      ` in ${location}`}
+
+                  </h2>
+
+
+
+                  <div className="flex gap-2">
+
+                    <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-sm hover:bg-gray-200">
+
+                      ‹
+
+                    </button>
+
+
+
+                    <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-sm hover:bg-gray-200">
+
+                      ›
+
                     </button>
 
                   </div>
 
-                  <div className="mt-3">
+                </div>
 
-                    <div className="flex items-start justify-between gap-2">
 
-                      <h3 className="font-semibold">
-                        {listing.title}
-                      </h3>
 
-                      <span className="text-sm">
-                        ★ 4.8
-                      </span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
 
-                    </div>
+                  {section.listings.map(
 
-                    <p className="mt-1 text-sm text-gray-500">
-                      {listing.location}
-                    </p>
+                    (
 
-                    <p className="mt-2">
+                      listing,
 
-                      <span className="font-semibold">
-                        ₹
-                        {listing.price_per_night.toLocaleString()}
-                      </span>{" "}
-                      night
+                      index
 
-                    </p>
+                    ) => {
 
-                  </div>
+                      const imageIndex =
+
+                        cardIndexes[
+
+                          listing.id
+
+                        ] || 0;
+
+
+
+                      const imageUrls =
+                        listing.image_urls && listing.image_urls.length > 0
+                          ? listing.image_urls
+                          : listing.image_url
+                            ? [listing.image_url]
+                            : ["/placeholder.jpg"];
+
+                      const safeImageIndex = imageIndex % imageUrls.length;
+                      const image = imageUrls[safeImageIndex];
+
+                      const rating =
+                        listing.rating !== null &&
+                        listing.rating !== undefined
+                          ? listing.rating.toFixed(1)
+                          : "New";
+
+
+
+                      return (
+
+                        <article
+
+                          key={`${sectionIndex}-${listing.id}`}
+
+                          onClick={() =>
+
+                            openListing(
+
+                              listing.id
+
+                            )
+
+                          }
+
+                          className="group cursor-pointer"
+
+                        >
+
+                          <div className="relative overflow-hidden rounded-2xl">
+
+                            <img
+
+                              src={image}
+
+                              alt={listing.title}
+
+                              loading={
+
+                                sectionIndex === 0 && index < 6
+
+                                  ? "eager"
+
+                                  : "lazy"
+
+                              }
+
+                              decoding="async"
+
+                              fetchPriority={
+
+                                sectionIndex === 0 && index < 3
+
+                                  ? "high"
+
+                                  : "auto"
+
+                              }
+
+                              className="h-64 w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+
+                            />
+
+
+
+                            {index % 3 ===
+
+                              0 && (
+
+                              <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm">
+
+                                Guest favourite
+
+                              </span>
+
+                            )}
+
+
+
+                            <button
+
+                              onClick={(
+
+                                event
+
+                              ) =>
+
+                                toggleFavorite(
+
+                                  event,
+
+                                  listing.id
+
+                                )
+
+                              }
+
+                              className="absolute right-3 top-3 cursor-pointer text-2xl text-white drop-shadow-md transition hover:scale-110"
+
+                              aria-label="Wishlist"
+
+                            >
+
+                              {favorites.includes(
+
+                                listing.id
+
+                              )
+
+                                ? "♥"
+
+                                : "♡"}
+
+                            </button>
+
+
+
+                            <button
+
+                              onClick={(
+
+                                event
+
+                              ) =>
+
+                                changeCardImage(
+                                    event,
+                                    listing.id,
+                                    -1,
+                                    imageUrls.length
+                                  )
+
+                              }
+
+                              className="absolute left-3 top-1/2 hidden h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-lg shadow group-hover:flex"
+
+                            >
+
+                              ‹
+
+                            </button>
+
+
+
+                            <button
+
+                              onClick={(
+
+                                event
+
+                              ) =>
+
+                                changeCardImage(
+                                    event,
+                                    listing.id,
+                                    1,
+                                    imageUrls.length
+                                  )
+
+                              }
+
+                              className="absolute right-3 top-1/2 hidden h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-lg shadow group-hover:flex"
+
+                            >
+
+                              ›
+
+                            </button>
+
+
+
+                            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1">
+
+                              {imageUrls.map((_, dot) => (
+
+                                  <span
+
+                                    key={
+
+                                      dot
+
+                                    }
+
+                                    className={`h-1.5 w-1.5 rounded-full ${
+
+                                      dot ===
+
+                                      imageIndex
+
+                                        ? "bg-white"
+
+                                        : "bg-white/50"
+
+                                    }`}
+
+                                  />
+
+                                )
+
+                              )}
+
+                            </div>
+
+                          </div>
+
+
+
+                          <div className="mt-3">
+
+                            <div className="flex items-start justify-between gap-2">
+
+                              <h3 className="truncate text-sm font-semibold">
+
+                                {
+
+                                  listing.title
+
+                                }
+
+                              </h3>
+
+
+
+                              <span className="shrink-0 text-sm">
+                                ★{" "}
+                                {rating}
+                                {listing.review_count !== undefined &&
+                                  listing.review_count > 0 && (
+                                    <span className="ml-1 text-gray-500">
+                                      ({listing.review_count})
+                                    </span>
+                                  )}
+                              </span>
+
+                            </div>
+
+
+
+                            <p className="mt-1 truncate text-sm text-gray-500">
+
+                              {
+
+                                listing.location
+
+                              }
+
+                            </p>
+
+
+
+                            <p className="mt-2 text-sm">
+
+                              <span className="font-semibold">
+
+                                ₹
+
+                                {listing.price_per_night.toLocaleString(
+
+                                  "en-IN"
+
+                                )}
+
+                              </span>{" "}
+
+                              night
+
+                            </p>
+
+                          </div>
+
+                        </article>
+
+                      );
+
+                    }
+
+                  )}
 
                 </div>
-              );
-            })}
 
-          </div>
+              </div>
+
+            )
+
+          )
 
         )}
 
       </section>
 
+
+
+      {/* =====================================================
+
+          FOOTER
+
+      ===================================================== */}
+
+
+
+      <footer className="border-t bg-gray-50">
+
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-6 py-12 md:grid-cols-3">
+
+          <div>
+
+            <h3 className="font-semibold">
+
+              Support
+
+            </h3>
+
+
+
+            <div className="mt-5 space-y-3 text-sm text-gray-600">
+
+              <p>Help Centre</p>
+
+              <p>Safety information</p>
+
+              <p>Cancellation options</p>
+
+              <p>AirCover</p>
+
+              <p>Accessibility</p>
+
+            </div>
+
+          </div>
+
+
+
+          <div>
+
+            <h3 className="font-semibold">
+
+              Hosting
+
+            </h3>
+
+
+
+            <div className="mt-5 space-y-3 text-sm text-gray-600">
+
+              <button
+
+                onClick={() =>
+
+                  router.push("/host")
+
+                }
+
+                className="block cursor-pointer hover:underline"
+
+              >
+
+                Airbnb your home
+
+              </button>
+
+
+
+              <p>Hosting resources</p>
+
+              <p>Community forum</p>
+
+              <p>Hosting responsibly</p>
+
+              <p>Find a co-host</p>
+
+            </div>
+
+          </div>
+
+
+
+          <div>
+
+            <h3 className="font-semibold">
+
+              Airbnb
+
+            </h3>
+
+
+
+            <div className="mt-5 space-y-3 text-sm text-gray-600">
+
+              <p>
+
+                2026 Summer Release
+
+              </p>
+
+
+
+              <p>Newsroom</p>
+
+              <p>Careers</p>
+
+              <p>Investors</p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <div className="border-t">
+
+          <div className="mx-auto flex max-w-[1440px] flex-col justify-between gap-3 px-6 py-6 text-sm text-gray-500 md:flex-row">
+
+            <span>
+
+              © 2026 Airbnb Clone · Privacy ·
+
+              Terms
+
+            </span>
+
+
+
+            <span>
+
+              🌐 English (IN) · ₹ INR
+
+            </span>
+
+          </div>
+
+        </div>
+
+      </footer>
+
+
+
+      {/* =====================================================
+
+          TOAST
+
+      ===================================================== */}
+
+
+
+      {toast && (
+
+        <div className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 rounded-xl bg-gray-900 px-6 py-4 text-sm font-medium text-white shadow-xl">
+
+          {toast}
+
+        </div>
+
+      )}
+
     </main>
+
   );
+
 }
